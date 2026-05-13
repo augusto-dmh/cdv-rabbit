@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Concerns\WorkspaceContext;
+use App\Queue\RedactingFailedJobProvider;
 use Carbon\CarbonImmutable;
+use Illuminate\Queue\Failed\DatabaseUuidFailedJobProvider;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
@@ -17,6 +19,16 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(WorkspaceContext::class);
+
+        $this->app->singleton('queue.failer', function ($app) {
+            $database = new DatabaseUuidFailedJobProvider(
+                $app['db'],
+                $app['config']['database.default'],
+                'failed_jobs',
+            );
+
+            return new RedactingFailedJobProvider($database, $app['events']);
+        });
     }
 
     /**
