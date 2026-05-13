@@ -13,10 +13,10 @@ return new class extends Migration
             $table->string('name');
             $table->string('slug')->unique();
             $table->foreignId('owner_id')->constrained('users')->cascadeOnDelete();
-            $table->string('bitbucket_workspace_slug')->unique();
-            $table->text('bitbucket_token');
-            $table->string('bitbucket_service_account');
-            $table->text('webhook_secret');
+            $table->string('bitbucket_workspace_slug')->unique()->nullable();
+            $table->text('bitbucket_token')->nullable();
+            $table->string('bitbucket_service_account')->nullable();
+            $table->text('webhook_secret')->nullable();
             $table->boolean('kill_switch_enabled')->default(false);
             $table->enum('health', ['healthy', 'degraded', 'unhealthy', 'paused'])->default('healthy');
             $table->timestamps();

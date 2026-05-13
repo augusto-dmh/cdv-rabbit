@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Middleware;
 
+use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -42,6 +45,39 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'workspaces' => $this->resolveWorkspaces($request),
+            'currentWorkspace' => $this->resolveCurrentWorkspace($request),
         ];
+    }
+
+    /**
+     * @return array<int, array{id: int, name: string, slug: string}>
+     */
+    private function resolveWorkspaces(Request $request): array
+    {
+        if (! $request->user()) {
+            return [];
+        }
+
+        return $request->user()
+            ->workspaces()
+            ->get(['workspaces.id', 'workspaces.name', 'workspaces.slug'])
+            ->map(fn (Workspace $w) => ['id' => $w->id, 'name' => $w->name, 'slug' => $w->slug])
+            ->all();
+    }
+
+    /**
+     * @return array{id: int, name: string, slug: string}|null
+     */
+    private function resolveCurrentWorkspace(Request $request): ?array
+    {
+        /** @var Workspace|null $workspace */
+        $workspace = $request->route('workspace');
+
+        if (! $workspace instanceof Workspace) {
+            return null;
+        }
+
+        return ['id' => $workspace->id, 'name' => $workspace->name, 'slug' => $workspace->slug];
     }
 }

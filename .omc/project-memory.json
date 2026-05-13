@@ -241,6 +241,18 @@
       "type": "file"
     },
     {
+      "path": "app/Models/User.php",
+      "accessCount": 8,
+      "lastAccessed": 1778715737744,
+      "type": "file"
+    },
+    {
+      "path": "routes/web.php",
+      "accessCount": 6,
+      "lastAccessed": 1778714147416,
+      "type": "file"
+    },
+    {
       "path": ".env.example",
       "accessCount": 5,
       "lastAccessed": 1778710236384,
@@ -259,18 +271,6 @@
       "type": "file"
     },
     {
-      "path": "routes/web.php",
-      "accessCount": 5,
-      "lastAccessed": 1778713917501,
-      "type": "file"
-    },
-    {
-      "path": "app/Models/User.php",
-      "accessCount": 5,
-      "lastAccessed": 1778713923421,
-      "type": "file"
-    },
-    {
       "path": "config/queue.php",
       "accessCount": 4,
       "lastAccessed": 1778710225356,
@@ -280,6 +280,18 @@
       "path": "app/Queue/RedactingFailedJobProvider.php",
       "accessCount": 4,
       "lastAccessed": 1778710964649,
+      "type": "file"
+    },
+    {
+      "path": "app/Concerns/WorkspaceContext.php",
+      "accessCount": 4,
+      "lastAccessed": 1778715751362,
+      "type": "file"
+    },
+    {
+      "path": "database/migrations/2026_05_13_000001_create_workspaces_table.php",
+      "accessCount": 4,
+      "lastAccessed": 1778715828811,
       "type": "file"
     },
     {
@@ -295,15 +307,21 @@
       "type": "file"
     },
     {
-      "path": "app/Concerns/WorkspaceContext.php",
-      "accessCount": 3,
-      "lastAccessed": 1778713920371,
-      "type": "file"
-    },
-    {
       "path": "app/Models/Workspace.php",
       "accessCount": 3,
       "lastAccessed": 1778713968824,
+      "type": "file"
+    },
+    {
+      "path": "app/Http/Middleware/HandleInertiaRequests.php",
+      "accessCount": 3,
+      "lastAccessed": 1778714183817,
+      "type": "file"
+    },
+    {
+      "path": "app/Concerns/BelongsToWorkspace.php",
+      "accessCount": 3,
+      "lastAccessed": 1778715750818,
       "type": "file"
     },
     {
@@ -334,12 +352,6 @@
       "path": "phpunit.xml",
       "accessCount": 2,
       "lastAccessed": 1778710256487,
-      "type": "file"
-    },
-    {
-      "path": "database/migrations/2026_05_13_000001_create_workspaces_table.php",
-      "accessCount": 2,
-      "lastAccessed": 1778710416898,
       "type": "file"
     },
     {
@@ -409,27 +421,21 @@
       "type": "file"
     },
     {
-      "path": "app/Concerns/BelongsToWorkspace.php",
+      "path": "routes/settings.php",
       "accessCount": 2,
-      "lastAccessed": 1778713681767,
+      "lastAccessed": 1778714078514,
+      "type": "file"
+    },
+    {
+      "path": "database/factories/WorkspaceFactory.php",
+      "accessCount": 2,
+      "lastAccessed": 1778714191159,
       "type": "file"
     },
     {
       "path": "app/Providers/FortifyServiceProvider.php",
       "accessCount": 1,
       "lastAccessed": 1778698394919,
-      "type": "file"
-    },
-    {
-      "path": "routes/settings.php",
-      "accessCount": 1,
-      "lastAccessed": 1778698399098,
-      "type": "file"
-    },
-    {
-      "path": "app/Http/Middleware/HandleInertiaRequests.php",
-      "accessCount": 1,
-      "lastAccessed": 1778698399241,
       "type": "file"
     },
     {
@@ -526,12 +532,6 @@
       "path": "database/factories/UserFactory.php",
       "accessCount": 1,
       "lastAccessed": 1778710817699,
-      "type": "file"
-    },
-    {
-      "path": "database/factories/WorkspaceFactory.php",
-      "accessCount": 1,
-      "lastAccessed": 1778710822866,
       "type": "file"
     }
   ],
