@@ -6,9 +6,10 @@
 > file describes the target; the git log describes the past;
 > this file bridges them.
 
-- **Last updated:** 2026-05-13 (during Phase 1 / Week 1 execution)
+- **Last updated:** 2026-05-13 (Phase 1 / Week 1 COMPLETE — tag `phase-1-complete`)
 - **Repo:** https://github.com/augusto-dmh/cdv-rabbit (private)
 - **Branch:** `main` only (trunk-based, no PR workflow yet)
+- **Test suite:** 69 tests, 210 assertions, all green on tag `phase-1-complete`
 
 ---
 
@@ -60,14 +61,14 @@ from migration 0001.
 ## 3. Current state (Phase 1 / Week 1)
 
 The plan runs 5 phases over 4–6 weeks:
-- **W1** domain model + Horizon/Redis + tenancy primitives — *in progress*
-- W2 Bitbucket integration layer — not started
+- **W1** domain model + Horizon/Redis + tenancy primitives — ✅ **COMPLETE** (tag `phase-1-complete`)
+- W2 Bitbucket integration layer — next, not started
 - W3 review pipeline (Claude + caching/streaming/tool_use) — not started
 - W4 Inertia UI — not started
 - W5 hardening + LGPD + observability — not started
 - W6 buffer / pilot — not started
 
-### W1 task graph + status
+### W1 task graph + status (all complete)
 
 | ID | Title | Status | Commit |
 |---|---|---|---|
@@ -75,12 +76,16 @@ The plan runs 5 phases over 4–6 weeks:
 | T2 | 7 migrations (workspaces, repos, reviews, comments, webhooks, llm_calls) | ✅ | `d27f786` |
 | T3 | WorkspaceContext singleton + fail-closed exception | ✅ | `74d8c04` |
 | T4 | Models + BelongsToWorkspace + enums + factories | ✅ | `92c4d68` |
-| T5 | BindWorkspaceMiddleware (queue middleware) | 🚧 in_progress | pending |
+| T5 | BindWorkspaceMiddleware + WorkspaceAwareJob contract | ✅ | `c1cc4c5` |
 | T6 | RedactingFailedJobProvider + RedactionApplied event | ✅ | `6856629` + fix `bb5a1e5` |
-| T7 | Phase 1 Pest test suite (AC4, AC12, AC16, AC17, AC18) | ⛔ blocked by T5 | pending |
+| T7 | Phase 1 Pest test suite (AC4, AC12, AC16, AC17, AC18) | ✅ | (this commit) |
 
-After T7 lands, Phase 1 verifier runs and tags `phase-1-complete` on
-the commit before W2 starts.
+Phase 1 verifier: 69 tests, 210 assertions, all green. Acceptance
+criteria covered: AC4 (partial — diff never in failed_jobs), AC12
+(cross-tenant isolation), AC16 (no diff in serialized job), AC17
+(failed-job redaction), AC18 (fail-closed global scope).
+
+Tag `phase-1-complete` applied. W2 is the next phase.
 
 ### What is on disk right now
 
@@ -98,13 +103,18 @@ the commit before W2 starts.
   `reviews`, `bitbucket-api`) in `config/horizon.php`.
 - `.env.example` carries Redis + Anthropic + Horizon env vars.
 
-### What is NOT on disk yet (W1 still owes)
+### Next phase (W2) — Bitbucket integration layer
 
-- `app/Queue/BindWorkspaceMiddleware.php` (T5, worker-2 building).
-- Pest tests for: `CrossWorkspaceIsolationTest`,
-  `BelongsToWorkspaceTest`, `WorkspaceTokenEncryptionTest`,
-  `BindWorkspaceMiddlewareTest`, `FailedJobRedactionTest`,
-  `JobSerializationLeakTest`, `MigrationsSmokeTest` (all T7).
+Per plan §3 Week 2, the next phase delivers:
+- `app/Services/Bitbucket/BitbucketClient.php` (HTTP client wrapping
+  BB Cloud REST v2 with retry/backoff, rate-limit honoring).
+- `app/Http/Controllers/Bitbucket/WebhookController.php` (HMAC auth,
+  idempotency via `webhook_deliveries.bitbucket_uuid`, dispatch).
+- Workspace connect wizard pages (`resources/js/pages/workspaces/Connect.vue`).
+- Repository discovery + webhook auto-registration on enable.
+
+W2 work has not started. Workers from W1 are idle/shut down. The
+next `/team` invocation will spin up a fresh team scoped to W2 tasks.
 
 ---
 
