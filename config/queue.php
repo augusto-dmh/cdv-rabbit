@@ -1,5 +1,7 @@
 <?php
 
+use App\Queue\RedactingFailedJobProvider;
+
 return [
 
     /*
@@ -121,7 +123,7 @@ return [
     */
 
     'failed' => [
-        'driver' => env('QUEUE_FAILED_DRIVER', App\Queue\RedactingFailedJobProvider::class),
+        'driver' => env('QUEUE_FAILED_DRIVER', RedactingFailedJobProvider::class),
         'database' => env('DB_CONNECTION', 'sqlite'),
         'table' => 'failed_jobs',
     ],

@@ -259,6 +259,12 @@
       "type": "file"
     },
     {
+      "path": "app/Providers/AppServiceProvider.php",
+      "accessCount": 3,
+      "lastAccessed": 1778710313593,
+      "type": "file"
+    },
+    {
       "path": "config/fortify.php",
       "accessCount": 2,
       "lastAccessed": 1778703881717,
@@ -289,9 +295,9 @@
       "type": "file"
     },
     {
-      "path": "app/Providers/AppServiceProvider.php",
+      "path": "tests/Unit/Concerns/WorkspaceContextTest.php",
       "accessCount": 2,
-      "lastAccessed": 1778710309497,
+      "lastAccessed": 1778710336514,
       "type": "file"
     },
     {
