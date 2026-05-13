@@ -1,0 +1,11 @@
+{"t":0,"agent":"aed4809","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"aca954e","agent_type":"document-specialist","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"aca954e","agent_type":"document-specialist","event":"agent_stop","success":true,"duration_ms":684240}
+{"t":0,"agent":"a4d9dd4","agent_type":"critic","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a4d9dd4","agent_type":"critic","event":"agent_stop","success":true,"duration_ms":95698}
+{"t":0,"agent":"system","event":"skill_invoked","skill_name":"oh-my-claudecode:team"}
+{"t":0,"agent":"a4339f0","agent_type":"worker-1","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a32ffc8","agent_type":"worker-2","event":"agent_start","parent_mode":"none"}
+{"t":0,"agent":"a45e8d9","agent_type":"unknown","event":"agent_stop","success":true}
+{"t":0,"agent":"system","event":"skill_invoked","skill_name":"configuring-horizon"}
+{"t":0,"agent":"a32ffc8","agent_type":"worker-2","event":"agent_stop","success":true,"duration_ms":76108}

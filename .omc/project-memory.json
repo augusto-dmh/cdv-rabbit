@@ -1,0 +1,389 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1778696752870,
+  "projectRoot": "/home/augusto/projects/cdv-rabbit",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      },
+      {
+        "name": "PHP",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "composer.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "vue",
+        "version": "3.5.13",
+        "category": "frontend"
+      },
+      {
+        "name": "vite",
+        "version": "8.0.0",
+        "category": "build"
+      }
+    ],
+    "packageManager": "composer",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": null,
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "build": "vite build",
+      "build:ssr": "vite build && vite build --ssr",
+      "dev": "vite",
+      "format": "prettier --write resources/",
+      "format:check": "prettier --check resources/",
+      "lint": "eslint . --fix",
+      "lint:check": "eslint .",
+      "types:check": "vue-tsc --noEmit"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": true,
+    "workspaces": [],
+    "mainDirectories": [
+      "app",
+      "public",
+      "tests"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "app": {
+      "path": "app",
+      "purpose": "Application code",
+      "fileCount": 0,
+      "lastAccessed": 1778696752854,
+      "keyFiles": []
+    },
+    "bootstrap": {
+      "path": "bootstrap",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1778696752855,
+      "keyFiles": [
+        "app.php",
+        "providers.php"
+      ]
+    },
+    "config": {
+      "path": "config",
+      "purpose": "Configuration files",
+      "fileCount": 12,
+      "lastAccessed": 1778696752861,
+      "keyFiles": [
+        "app.php",
+        "auth.php",
+        "cache.php",
+        "database.php",
+        "filesystems.php"
+      ]
+    },
+    "database": {
+      "path": "database",
+      "purpose": null,
+      "fileCount": 2,
+      "lastAccessed": 1778696752861,
+      "keyFiles": [
+        "database.sqlite"
+      ]
+    },
+    "public": {
+      "path": "public",
+      "purpose": "Public files",
+      "fileCount": 8,
+      "lastAccessed": 1778696752861,
+      "keyFiles": [
+        "apple-touch-icon.png",
+        "favicon.ico",
+        "favicon.svg",
+        "fonts-manifest.dev.json",
+        "hot"
+      ]
+    },
+    "resources": {
+      "path": "resources",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778696752861,
+      "keyFiles": []
+    },
+    "routes": {
+      "path": "routes",
+      "purpose": "Route handlers",
+      "fileCount": 3,
+      "lastAccessed": 1778696752862,
+      "keyFiles": [
+        "console.php",
+        "settings.php",
+        "web.php"
+      ]
+    },
+    "storage": {
+      "path": "storage",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1778696752862,
+      "keyFiles": []
+    },
+    "tests": {
+      "path": "tests",
+      "purpose": "Test files",
+      "fileCount": 2,
+      "lastAccessed": 1778696752862,
+      "keyFiles": [
+        "Pest.php",
+        "TestCase.php"
+      ]
+    },
+    "vendor": {
+      "path": "vendor",
+      "purpose": "Third-party code",
+      "fileCount": 2,
+      "lastAccessed": 1778696752862,
+      "keyFiles": [
+        "autoload.php",
+        "pest-plugins.json"
+      ]
+    },
+    "app/Models": {
+      "path": "app/Models",
+      "purpose": "Data models",
+      "fileCount": 1,
+      "lastAccessed": 1778696752862,
+      "keyFiles": [
+        "User.php"
+      ]
+    },
+    "database/migrations": {
+      "path": "database/migrations",
+      "purpose": "Database migrations",
+      "fileCount": 4,
+      "lastAccessed": 1778696752863,
+      "keyFiles": [
+        "0001_01_01_000000_create_users_table.php",
+        "0001_01_01_000001_create_cache_table.php",
+        "0001_01_01_000002_create_jobs_table.php"
+      ]
+    },
+    "public/build": {
+      "path": "public/build",
+      "purpose": "Build output",
+      "fileCount": 2,
+      "lastAccessed": 1778696752864,
+      "keyFiles": [
+        "fonts-manifest.json",
+        "manifest.json"
+      ]
+    },
+    "resources/views": {
+      "path": "resources/views",
+      "purpose": "View templates",
+      "fileCount": 1,
+      "lastAccessed": 1778696752864,
+      "keyFiles": [
+        "app.blade.php"
+      ]
+    },
+    "storage/app": {
+      "path": "storage/app",
+      "purpose": "Application code",
+      "fileCount": 1,
+      "lastAccessed": 1778696752864,
+      "keyFiles": []
+    },
+    "vendor/bin": {
+      "path": "vendor/bin",
+      "purpose": "Executable scripts",
+      "fileCount": 12,
+      "lastAccessed": 1778696752865,
+      "keyFiles": [
+        "carbon",
+        "paratest",
+        "paratest_for_phpstorm"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": ".env.example",
+      "accessCount": 5,
+      "lastAccessed": 1778710236384,
+      "type": "file"
+    },
+    {
+      "path": "config/queue.php",
+      "accessCount": 4,
+      "lastAccessed": 1778710225356,
+      "type": "file"
+    },
+    {
+      "path": "app/Models/User.php",
+      "accessCount": 3,
+      "lastAccessed": 1778710167564,
+      "type": "file"
+    },
+    {
+      "path": "tests/Pest.php",
+      "accessCount": 3,
+      "lastAccessed": 1778710266178,
+      "type": "file"
+    },
+    {
+      "path": "config/fortify.php",
+      "accessCount": 2,
+      "lastAccessed": 1778703881717,
+      "type": "file"
+    },
+    {
+      "path": "config/database.php",
+      "accessCount": 2,
+      "lastAccessed": 1778710119686,
+      "type": "file"
+    },
+    {
+      "path": "composer.json",
+      "accessCount": 2,
+      "lastAccessed": 1778710120108,
+      "type": "file"
+    },
+    {
+      "path": "config/horizon.php",
+      "accessCount": 2,
+      "lastAccessed": 1778710218842,
+      "type": "file"
+    },
+    {
+      "path": "phpunit.xml",
+      "accessCount": 2,
+      "lastAccessed": 1778710256487,
+      "type": "file"
+    },
+    {
+      "path": "app/Providers/AppServiceProvider.php",
+      "accessCount": 2,
+      "lastAccessed": 1778710309497,
+      "type": "file"
+    },
+    {
+      "path": "app/Providers/FortifyServiceProvider.php",
+      "accessCount": 1,
+      "lastAccessed": 1778698394919,
+      "type": "file"
+    },
+    {
+      "path": "routes/web.php",
+      "accessCount": 1,
+      "lastAccessed": 1778698395122,
+      "type": "file"
+    },
+    {
+      "path": "routes/settings.php",
+      "accessCount": 1,
+      "lastAccessed": 1778698399098,
+      "type": "file"
+    },
+    {
+      "path": "app/Http/Middleware/HandleInertiaRequests.php",
+      "accessCount": 1,
+      "lastAccessed": 1778698399241,
+      "type": "file"
+    },
+    {
+      "path": "vite.config.ts",
+      "accessCount": 1,
+      "lastAccessed": 1778698399616,
+      "type": "file"
+    },
+    {
+      "path": "package.json",
+      "accessCount": 1,
+      "lastAccessed": 1778698399694,
+      "type": "file"
+    },
+    {
+      "path": "components.json",
+      "accessCount": 1,
+      "lastAccessed": 1778698401920,
+      "type": "file"
+    },
+    {
+      "path": "eslint.config.js",
+      "accessCount": 1,
+      "lastAccessed": 1778698402096,
+      "type": "file"
+    },
+    {
+      "path": "config/logging.php",
+      "accessCount": 1,
+      "lastAccessed": 1778703881771,
+      "type": "file"
+    },
+    {
+      "path": "app/Http/Controllers/Settings/ProfileController.php",
+      "accessCount": 1,
+      "lastAccessed": 1778703882613,
+      "type": "file"
+    },
+    {
+      "path": "app/Http/Controllers/Settings/SecurityController.php",
+      "accessCount": 1,
+      "lastAccessed": 1778703883196,
+      "type": "file"
+    },
+    {
+      "path": "tests/Feature/DashboardTest.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710178276,
+      "type": "file"
+    },
+    {
+      "path": "tests/TestCase.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710259650,
+      "type": "file"
+    },
+    {
+      "path": "app/Concerns/WorkspaceContext.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710302154,
+      "type": "file"
+    },
+    {
+      "path": "app/Exceptions/WorkspaceContextMissingException.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710304972,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
