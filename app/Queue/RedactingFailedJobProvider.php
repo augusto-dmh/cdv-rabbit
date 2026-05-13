@@ -39,6 +39,11 @@ class RedactingFailedJobProvider implements FailedJobProviderInterface
         return $this->inner->log($connection, $queue, $payload, $exception);
     }
 
+    public function ids($queue = null): array
+    {
+        return $this->inner->ids($queue);
+    }
+
     public function all(): array
     {
         return $this->inner->all();
@@ -54,7 +59,7 @@ class RedactingFailedJobProvider implements FailedJobProviderInterface
         return $this->inner->forget($id);
     }
 
-    public function flush(?int $hours = null): void
+    public function flush($hours = null): void
     {
         $this->inner->flush($hours);
     }
