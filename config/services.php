@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'bitbucket' => [
+        'base_url' => env('BITBUCKET_BASE_URL', 'https://api.bitbucket.org/2.0'),
+        'webhook_base_url' => env('BITBUCKET_WEBHOOK_BASE_URL', env('APP_URL').'/bb/webhook'),
+    ],
+
 ];
