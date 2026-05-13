@@ -235,9 +235,21 @@
   },
   "hotPaths": [
     {
+      "path": "app/Providers/AppServiceProvider.php",
+      "accessCount": 6,
+      "lastAccessed": 1778710638401,
+      "type": "file"
+    },
+    {
       "path": ".env.example",
       "accessCount": 5,
       "lastAccessed": 1778710236384,
+      "type": "file"
+    },
+    {
+      "path": "tests/Unit/Queue/RedactingFailedJobProviderTest.php",
+      "accessCount": 5,
+      "lastAccessed": 1778710924835,
       "type": "file"
     },
     {
@@ -247,21 +259,27 @@
       "type": "file"
     },
     {
-      "path": "app/Providers/AppServiceProvider.php",
+      "path": "app/Models/User.php",
       "accessCount": 4,
-      "lastAccessed": 1778710458059,
+      "lastAccessed": 1778710775902,
       "type": "file"
     },
     {
-      "path": "app/Models/User.php",
-      "accessCount": 3,
-      "lastAccessed": 1778710167564,
+      "path": "app/Queue/RedactingFailedJobProvider.php",
+      "accessCount": 4,
+      "lastAccessed": 1778710964649,
       "type": "file"
     },
     {
       "path": "tests/Pest.php",
       "accessCount": 3,
       "lastAccessed": 1778710266178,
+      "type": "file"
+    },
+    {
+      "path": "tests/Unit/Concerns/WorkspaceContextTest.php",
+      "accessCount": 3,
+      "lastAccessed": 1778710583786,
       "type": "file"
     },
     {
@@ -292,12 +310,6 @@
       "path": "phpunit.xml",
       "accessCount": 2,
       "lastAccessed": 1778710256487,
-      "type": "file"
-    },
-    {
-      "path": "tests/Unit/Concerns/WorkspaceContextTest.php",
-      "accessCount": 2,
-      "lastAccessed": 1778710336514,
       "type": "file"
     },
     {
@@ -343,9 +355,9 @@
       "type": "file"
     },
     {
-      "path": "tests/Unit/Queue/RedactingFailedJobProviderTest.php",
+      "path": "app/Events/RedactionApplied.php",
       "accessCount": 2,
-      "lastAccessed": 1778710491130,
+      "lastAccessed": 1778710932364,
       "type": "file"
     },
     {
@@ -439,15 +451,87 @@
       "type": "file"
     },
     {
-      "path": "app/Events/RedactionApplied.php",
+      "path": "app/Enums/WorkspaceHealth.php",
       "accessCount": 1,
-      "lastAccessed": 1778710469445,
+      "lastAccessed": 1778710783453,
       "type": "file"
     },
     {
-      "path": "app/Queue/RedactingFailedJobProvider.php",
+      "path": "app/Enums/ReviewStatus.php",
       "accessCount": 1,
-      "lastAccessed": 1778710479893,
+      "lastAccessed": 1778710784616,
+      "type": "file"
+    },
+    {
+      "path": "app/Enums/CommentType.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710785368,
+      "type": "file"
+    },
+    {
+      "path": "app/Enums/WebhookDeliveryStatus.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710786586,
+      "type": "file"
+    },
+    {
+      "path": "app/Enums/LlmCallRole.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710787259,
+      "type": "file"
+    },
+    {
+      "path": "app/Concerns/BelongsToWorkspace.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710793075,
+      "type": "file"
+    },
+    {
+      "path": "app/Models/Workspace.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710799549,
+      "type": "file"
+    },
+    {
+      "path": "app/Models/Repository.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710802658,
+      "type": "file"
+    },
+    {
+      "path": "app/Models/Review.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710806425,
+      "type": "file"
+    },
+    {
+      "path": "app/Models/ReviewComment.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710808792,
+      "type": "file"
+    },
+    {
+      "path": "app/Models/WebhookDelivery.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710811423,
+      "type": "file"
+    },
+    {
+      "path": "app/Models/ReviewsLlmCall.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710814605,
+      "type": "file"
+    },
+    {
+      "path": "database/factories/UserFactory.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710817699,
+      "type": "file"
+    },
+    {
+      "path": "database/factories/WorkspaceFactory.php",
+      "accessCount": 1,
+      "lastAccessed": 1778710822866,
       "type": "file"
     }
   ],
