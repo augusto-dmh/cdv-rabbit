@@ -361,6 +361,12 @@
       "type": "file"
     },
     {
+      "path": "app/Concerns/WorkspaceContext.php",
+      "accessCount": 2,
+      "lastAccessed": 1778712771813,
+      "type": "file"
+    },
+    {
       "path": "app/Providers/FortifyServiceProvider.php",
       "accessCount": 1,
       "lastAccessed": 1778698394919,
@@ -436,12 +442,6 @@
       "path": "tests/TestCase.php",
       "accessCount": 1,
       "lastAccessed": 1778710259650,
-      "type": "file"
-    },
-    {
-      "path": "app/Concerns/WorkspaceContext.php",
-      "accessCount": 1,
-      "lastAccessed": 1778710302154,
       "type": "file"
     },
     {
