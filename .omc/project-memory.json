@@ -236,8 +236,8 @@
   "hotPaths": [
     {
       "path": "app/Providers/AppServiceProvider.php",
-      "accessCount": 6,
-      "lastAccessed": 1778710638401,
+      "accessCount": 10,
+      "lastAccessed": 1778713941829,
       "type": "file"
     },
     {
@@ -253,15 +253,27 @@
       "type": "file"
     },
     {
-      "path": "config/queue.php",
-      "accessCount": 4,
-      "lastAccessed": 1778710225356,
+      "path": "tests/Pest.php",
+      "accessCount": 5,
+      "lastAccessed": 1778713658614,
+      "type": "file"
+    },
+    {
+      "path": "routes/web.php",
+      "accessCount": 5,
+      "lastAccessed": 1778713917501,
       "type": "file"
     },
     {
       "path": "app/Models/User.php",
+      "accessCount": 5,
+      "lastAccessed": 1778713923421,
+      "type": "file"
+    },
+    {
+      "path": "config/queue.php",
       "accessCount": 4,
-      "lastAccessed": 1778710775902,
+      "lastAccessed": 1778710225356,
       "type": "file"
     },
     {
@@ -271,15 +283,27 @@
       "type": "file"
     },
     {
-      "path": "tests/Pest.php",
-      "accessCount": 4,
-      "lastAccessed": 1778712965531,
-      "type": "file"
-    },
-    {
       "path": "tests/Unit/Concerns/WorkspaceContextTest.php",
       "accessCount": 3,
       "lastAccessed": 1778710583786,
+      "type": "file"
+    },
+    {
+      "path": "config/logging.php",
+      "accessCount": 3,
+      "lastAccessed": 1778713511140,
+      "type": "file"
+    },
+    {
+      "path": "app/Concerns/WorkspaceContext.php",
+      "accessCount": 3,
+      "lastAccessed": 1778713920371,
+      "type": "file"
+    },
+    {
+      "path": "app/Models/Workspace.php",
+      "accessCount": 3,
+      "lastAccessed": 1778713968824,
       "type": "file"
     },
     {
@@ -361,21 +385,39 @@
       "type": "file"
     },
     {
-      "path": "app/Concerns/WorkspaceContext.php",
+      "path": "app/Http/Controllers/Settings/ProfileController.php",
       "accessCount": 2,
-      "lastAccessed": 1778712771813,
+      "lastAccessed": 1778713479132,
+      "type": "file"
+    },
+    {
+      "path": "app/Models/Repository.php",
+      "accessCount": 2,
+      "lastAccessed": 1778713590496,
+      "type": "file"
+    },
+    {
+      "path": "app/Models/WebhookDelivery.php",
+      "accessCount": 2,
+      "lastAccessed": 1778713593807,
+      "type": "file"
+    },
+    {
+      "path": "app/Enums/WebhookDeliveryStatus.php",
+      "accessCount": 2,
+      "lastAccessed": 1778713598183,
+      "type": "file"
+    },
+    {
+      "path": "app/Concerns/BelongsToWorkspace.php",
+      "accessCount": 2,
+      "lastAccessed": 1778713681767,
       "type": "file"
     },
     {
       "path": "app/Providers/FortifyServiceProvider.php",
       "accessCount": 1,
       "lastAccessed": 1778698394919,
-      "type": "file"
-    },
-    {
-      "path": "routes/web.php",
-      "accessCount": 1,
-      "lastAccessed": 1778698395122,
       "type": "file"
     },
     {
@@ -412,18 +454,6 @@
       "path": "eslint.config.js",
       "accessCount": 1,
       "lastAccessed": 1778698402096,
-      "type": "file"
-    },
-    {
-      "path": "config/logging.php",
-      "accessCount": 1,
-      "lastAccessed": 1778703881771,
-      "type": "file"
-    },
-    {
-      "path": "app/Http/Controllers/Settings/ProfileController.php",
-      "accessCount": 1,
-      "lastAccessed": 1778703882613,
       "type": "file"
     },
     {
@@ -469,33 +499,9 @@
       "type": "file"
     },
     {
-      "path": "app/Enums/WebhookDeliveryStatus.php",
-      "accessCount": 1,
-      "lastAccessed": 1778710786586,
-      "type": "file"
-    },
-    {
       "path": "app/Enums/LlmCallRole.php",
       "accessCount": 1,
       "lastAccessed": 1778710787259,
-      "type": "file"
-    },
-    {
-      "path": "app/Concerns/BelongsToWorkspace.php",
-      "accessCount": 1,
-      "lastAccessed": 1778710793075,
-      "type": "file"
-    },
-    {
-      "path": "app/Models/Workspace.php",
-      "accessCount": 1,
-      "lastAccessed": 1778710799549,
-      "type": "file"
-    },
-    {
-      "path": "app/Models/Repository.php",
-      "accessCount": 1,
-      "lastAccessed": 1778710802658,
       "type": "file"
     },
     {
@@ -508,12 +514,6 @@
       "path": "app/Models/ReviewComment.php",
       "accessCount": 1,
       "lastAccessed": 1778710808792,
-      "type": "file"
-    },
-    {
-      "path": "app/Models/WebhookDelivery.php",
-      "accessCount": 1,
-      "lastAccessed": 1778710811423,
       "type": "file"
     },
     {

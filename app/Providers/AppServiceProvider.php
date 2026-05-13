@@ -3,11 +3,14 @@
 namespace App\Providers;
 
 use App\Concerns\WorkspaceContext;
+use App\Models\Repository;
+use App\Models\Workspace;
 use App\Queue\RedactingFailedJobProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Queue\Failed\DatabaseUuidFailedJobProvider;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -37,6 +40,21 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->configureRouteBindings();
+    }
+
+    protected function configureRouteBindings(): void
+    {
+        Route::bind('repository', function (string $value): Repository {
+            $repository = Repository::withoutWorkspaceScope()->findOrFail($value);
+            app(WorkspaceContext::class)->bind($repository->workspace_id);
+
+            return $repository;
+        });
+
+        Route::bind('workspace', function (string $value): Workspace {
+            return Workspace::withoutGlobalScope('workspace')->where('slug', $value)->firstOrFail();
+        });
     }
 
     /**
