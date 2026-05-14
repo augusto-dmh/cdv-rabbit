@@ -9,7 +9,7 @@ use App\Models\Workspace;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Redis;
 
-final class CostReservation
+final class CostReservation implements CostReservationInterface
 {
     private const TTL_SECONDS = 93600; // 26 hours — covers timezone slack
 

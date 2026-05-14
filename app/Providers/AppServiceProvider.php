@@ -6,6 +6,8 @@ use App\Concerns\WorkspaceContext;
 use App\Models\Repository;
 use App\Models\Workspace;
 use App\Queue\RedactingFailedJobProvider;
+use App\Services\Review\CostReservation;
+use App\Services\Review\CostReservationInterface;
 use Carbon\CarbonImmutable;
 use Illuminate\Queue\Failed\DatabaseUuidFailedJobProvider;
 use Illuminate\Support\Facades\Date;
@@ -22,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(WorkspaceContext::class);
+        $this->app->bind(CostReservationInterface::class, CostReservation::class);
 
         $this->app->singleton('queue.failer', function ($app) {
             $database = new DatabaseUuidFailedJobProvider(
