@@ -25,8 +25,17 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(WorkspaceContext::class);
         $this->app->bind(CostReservationInterface::class, CostReservation::class);
+    }
 
-        $this->app->singleton('queue.failer', function ($app) {
+    // QueueServiceProvider is deferred — it registers queue.failer lazily. Using extend()
+    // wraps the resolved value after the deferred provider registers and resolves it.
+    protected function rebindFailedJobProvider(): void
+    {
+        $this->app->extend('queue.failer', function ($failer, $app) {
+            if ($failer instanceof RedactingFailedJobProvider) {
+                return $failer;
+            }
+
             $database = new DatabaseUuidFailedJobProvider(
                 $app['db'],
                 $app['config']['database.default'],
@@ -42,6 +51,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->rebindFailedJobProvider();
         $this->configureDefaults();
         $this->configureRouteBindings();
     }
