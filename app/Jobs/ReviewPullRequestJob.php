@@ -98,8 +98,8 @@ class ReviewPullRequestJob implements ShouldQueue
             ]
         );
 
-        // AC8: kill switch — abort before any external call
-        if ($workspace->kill_switch_enabled) {
+        // AC8: kill switch — abort before any external call (per-workspace or global operator flag)
+        if ($workspace->kill_switch_enabled || config('cdv-rabbit.killed')) {
             $review->update(['status' => ReviewStatus::Skipped, 'finished_at' => now()]);
             Log::info('ReviewPullRequestJob: kill switch enabled, skipping', ['review_id' => $review->id]);
 

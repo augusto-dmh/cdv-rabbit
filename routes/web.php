@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\KillSwitchController;
 use App\Http\Controllers\Reviews\ReviewController;
 use App\Http\Controllers\Workspaces\ConnectController;
 use App\Http\Controllers\Workspaces\RepositoryController;
@@ -30,6 +31,9 @@ Route::middleware(['auth', 'verified', 'workspace.member'])
 
         Route::get('reviews', [ReviewController::class, 'index'])->name('workspaces.reviews.index');
         Route::get('reviews/{review}', [ReviewController::class, 'show'])->name('workspaces.reviews.show');
+
+        Route::get('admin/kill-switch', [KillSwitchController::class, 'edit'])->name('workspaces.admin.kill-switch.edit');
+        Route::put('admin/kill-switch', [KillSwitchController::class, 'update'])->name('workspaces.admin.kill-switch.update');
     });
 
 require __DIR__.'/settings.php';
