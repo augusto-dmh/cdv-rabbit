@@ -1,0 +1,36 @@
+{
+  "name": "review_result",
+  "strict": true,
+  "description": "Returns a complete code review for the supplied diff",
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["summary", "comments"],
+    "properties": {
+      "summary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["overview", "risk_level"],
+        "properties": {
+          "overview": { "type": "string", "maxLength": 2000 },
+          "risk_level": { "enum": ["low", "medium", "high"] }
+        }
+      },
+      "comments": {
+        "type": "array",
+        "maxItems": 50,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "line", "severity", "message"],
+          "properties": {
+            "path": { "type": "string" },
+            "line": { "type": "integer", "minimum": 1 },
+            "severity": { "enum": ["high", "medium", "low", "nit"] },
+            "message": { "type": "string", "maxLength": 1500 }
+          }
+        }
+      }
+    }
+  }
+}
