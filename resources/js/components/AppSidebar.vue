@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { Link } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid, Layers } from 'lucide-vue-next';
+import { Link, usePage } from '@inertiajs/vue3';
+import { BookOpen, FolderGit2, GitPullRequestArrow, LayoutGrid, Layers } from 'lucide-vue-next';
+import { computed } from 'vue';
+import { index as reviewsIndex } from '@/actions/App/Http/Controllers/Reviews/ReviewController';
 import { index as workspacesIndex } from '@/actions/App/Http/Controllers/Workspaces/WorkspaceController';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
@@ -18,7 +20,10 @@ import {
 import { dashboard } from '@/routes';
 import type { NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
+const page = usePage<{ currentWorkspace: { id: number; name: string; slug: string } | null }>();
+const currentWorkspace = computed(() => page.props.currentWorkspace);
+
+const baseNavItems: NavItem[] = [
     {
         title: 'Dashboard',
         href: dashboard(),
@@ -30,6 +35,21 @@ const mainNavItems: NavItem[] = [
         icon: Layers,
     },
 ];
+
+const mainNavItems = computed<NavItem[]>(() => {
+    if (!currentWorkspace.value) {
+        return baseNavItems;
+    }
+
+    return [
+        ...baseNavItems,
+        {
+            title: 'Reviews',
+            href: reviewsIndex.url(currentWorkspace.value),
+            icon: GitPullRequestArrow,
+        },
+    ];
+});
 
 const footerNavItems: NavItem[] = [
     {
@@ -62,6 +82,7 @@ const footerNavItems: NavItem[] = [
         <SidebarContent>
             <NavMain :items="mainNavItems" />
         </SidebarContent>
+
 
         <SidebarFooter>
             <NavFooter :items="footerNavItems" />
