@@ -1,12 +1,15 @@
 <?php
 
 use App\Http\Controllers\Admin\KillSwitchController;
+use App\Http\Controllers\Health\HealthController;
 use App\Http\Controllers\Reviews\ReviewController;
 use App\Http\Controllers\Workspaces\ConnectController;
 use App\Http\Controllers\Workspaces\RepositoryController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 use Laravel\Fortify\Features;
+
+Route::get('/up', HealthController::class)->name('health');
 
 Route::inertia('/', 'Welcome', [
     'canRegister' => Features::enabled(Features::registration()),
