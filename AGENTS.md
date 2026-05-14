@@ -6,8 +6,8 @@
 > file describes the target; the git log describes the past;
 > this file bridges them.
 
-- **Last updated:** 2026-05-14 (Phase 4 COMPLETE — tag `phase-4-complete`; plan v1.4)
-- **Test suite:** 288 tests, 874 assertions, all green on tag `phase-4-complete`
+- **Last updated:** 2026-05-14 (MVP COMPLETE — tag `phase-5-complete` + `v0.1.0-mvp`)
+- **Test suite:** 329 tests, 1029 assertions, all green on tag `phase-5-complete`
 - **Repo:** https://github.com/augusto-dmh/cdv-rabbit (private)
 - **Branch:** `main` only (trunk-based, no PR workflow yet)
 
@@ -52,6 +52,9 @@ from migration 0001.
    - `cost-management-and-ceiling-alerts.md` (Phase 3)
    - `review-dashboard.md` (Phase 4)
    - `kill-switch-control.md` (Phase 4)
+   - `observability-and-structured-logs.md` (Phase 5)
+   - `health-and-readiness-checks.md` (Phase 5)
+   - `lgpd-compliance-tooling.md` (Phase 5)
 4. **`.omc/plans/cdv-rabbit-mvp-minimal.md`** — authoritative plan,
    v1.4, APPROVED WITH MINOR REVISIONS by two Critic passes. Read in
    full when planning or implementing. Especially:
@@ -77,8 +80,10 @@ The plan runs 5 phases over 4–6 weeks:
 - **W2** Bitbucket integration layer — ✅ **COMPLETE** (tag `phase-2-complete`)
 - **W3** review pipeline (Claude via laravel/ai + caching/streaming/tool_use) — ✅ **COMPLETE** (tag `phase-3-complete`)
 - **W4** reviews UI + kill switch UI — ✅ **COMPLETE** (tag `phase-4-complete`)
-- W5 hardening + LGPD + observability — next, not started
-- W6 buffer / pilot — not started
+- **W5** hardening + LGPD + observability — ✅ **COMPLETE** (tag `phase-5-complete`)
+- W6 buffer / pilot — operational gate (DPO sign-off, Anthropic budget, BB service account, prod infra)
+
+🎉 **MVP CODE COMPLETE.** All 5 phases shipped, all 26 acceptance criteria covered, 329/1029 tests green. Remaining items before GA are operational sign-offs listed in plan §12.
 
 ### W1 task graph + status (all complete)
 
