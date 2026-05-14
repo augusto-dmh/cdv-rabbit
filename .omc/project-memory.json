@@ -254,8 +254,8 @@
     },
     {
       "path": ".env.example",
-      "accessCount": 5,
-      "lastAccessed": 1778710236384,
+      "accessCount": 7,
+      "lastAccessed": 1778718702994,
       "type": "file"
     },
     {
@@ -307,6 +307,12 @@
       "type": "file"
     },
     {
+      "path": "app/Models/Workspace.php",
+      "accessCount": 4,
+      "lastAccessed": 1778717832167,
+      "type": "file"
+    },
+    {
       "path": "tests/Unit/Concerns/WorkspaceContextTest.php",
       "accessCount": 3,
       "lastAccessed": 1778710583786,
@@ -319,15 +325,21 @@
       "type": "file"
     },
     {
-      "path": "app/Models/Workspace.php",
-      "accessCount": 3,
-      "lastAccessed": 1778713968824,
-      "type": "file"
-    },
-    {
       "path": "app/Concerns/BelongsToWorkspace.php",
       "accessCount": 3,
       "lastAccessed": 1778715750818,
+      "type": "file"
+    },
+    {
+      "path": "database/migrations/2026_05_13_000007_create_reviews_llm_calls_table.php",
+      "accessCount": 3,
+      "lastAccessed": 1778717823010,
+      "type": "file"
+    },
+    {
+      "path": "database/migrations/2026_05_13_000005_create_review_comments_table.php",
+      "accessCount": 3,
+      "lastAccessed": 1778717823319,
       "type": "file"
     },
     {
@@ -373,21 +385,9 @@
       "type": "file"
     },
     {
-      "path": "database/migrations/2026_05_13_000005_create_review_comments_table.php",
-      "accessCount": 2,
-      "lastAccessed": 1778710430567,
-      "type": "file"
-    },
-    {
       "path": "database/migrations/2026_05_13_000006_create_webhook_deliveries_table.php",
       "accessCount": 2,
       "lastAccessed": 1778710433713,
-      "type": "file"
-    },
-    {
-      "path": "database/migrations/2026_05_13_000007_create_reviews_llm_calls_table.php",
-      "accessCount": 2,
-      "lastAccessed": 1778710438422,
       "type": "file"
     },
     {
@@ -430,6 +430,24 @@
       "path": "database/factories/WorkspaceFactory.php",
       "accessCount": 2,
       "lastAccessed": 1778714191159,
+      "type": "file"
+    },
+    {
+      "path": "app/Models/ReviewComment.php",
+      "accessCount": 2,
+      "lastAccessed": 1778717826124,
+      "type": "file"
+    },
+    {
+      "path": "app/Models/ReviewsLlmCall.php",
+      "accessCount": 2,
+      "lastAccessed": 1778717827014,
+      "type": "file"
+    },
+    {
+      "path": "app/Models/Review.php",
+      "accessCount": 2,
+      "lastAccessed": 1778717827497,
       "type": "file"
     },
     {
@@ -508,24 +526,6 @@
       "path": "app/Enums/LlmCallRole.php",
       "accessCount": 1,
       "lastAccessed": 1778710787259,
-      "type": "file"
-    },
-    {
-      "path": "app/Models/Review.php",
-      "accessCount": 1,
-      "lastAccessed": 1778710806425,
-      "type": "file"
-    },
-    {
-      "path": "app/Models/ReviewComment.php",
-      "accessCount": 1,
-      "lastAccessed": 1778710808792,
-      "type": "file"
-    },
-    {
-      "path": "app/Models/ReviewsLlmCall.php",
-      "accessCount": 1,
-      "lastAccessed": 1778710814605,
       "type": "file"
     },
     {
