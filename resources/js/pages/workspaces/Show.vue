@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
-import { ExternalLink } from 'lucide-vue-next';
+import { Form, Head, Link, router } from '@inertiajs/vue3';
+import { ExternalLink, RefreshCw } from 'lucide-vue-next';
 import ConnectController from '@/actions/App/Http/Controllers/Workspaces/ConnectController';
+import RepositoryController from '@/actions/App/Http/Controllers/Workspaces/RepositoryController';
 import { index } from '@/actions/App/Http/Controllers/Workspaces/WorkspaceController';
 import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
@@ -32,7 +33,7 @@ type Props = {
     repositories: Repository[];
 };
 
-defineProps<Props>();
+const props = defineProps<Props>();
 
 defineOptions({
     layout: {
@@ -48,6 +49,14 @@ defineOptions({
         ],
     },
 });
+
+function toggleEnabled(repo: Repository): void {
+    router.patch(
+        RepositoryController.update.url({ workspace: props.workspace.slug, repository: repo.id }),
+        { enabled: !repo.enabled },
+        { preserveScroll: true },
+    );
+}
 </script>
 
 <template>
@@ -71,15 +80,25 @@ defineOptions({
         </div>
 
         <Card>
-            <CardHeader>
+            <CardHeader class="flex flex-row items-center justify-between space-y-0">
                 <CardTitle>Repositories</CardTitle>
+                <Form
+                    v-if="workspace.bitbucket_workspace_slug"
+                    v-bind="RepositoryController.sync.form(workspace.slug)"
+                    v-slot="{ processing }"
+                >
+                    <Button type="submit" size="sm" variant="outline" :disabled="processing">
+                        <RefreshCw class="mr-2 h-3.5 w-3.5" :class="{ 'animate-spin': processing }" />
+                        Sync repositories
+                    </Button>
+                </Form>
             </CardHeader>
             <CardContent>
                 <div v-if="repositories.length === 0" class="py-8 text-center text-sm text-muted-foreground">
                     <p v-if="!workspace.bitbucket_workspace_slug">
                         Connect your Bitbucket workspace first to discover repositories.
                     </p>
-                    <p v-else>No repositories found. Sync your repositories from the connection settings.</p>
+                    <p v-else>No repositories found. Click "Sync repositories" to import from Bitbucket.</p>
                 </div>
 
                 <table v-else class="w-full text-sm">
@@ -87,8 +106,9 @@ defineOptions({
                         <tr class="border-b text-left text-muted-foreground">
                             <th class="pb-3 pr-4 font-medium">Repository</th>
                             <th class="pb-3 pr-4 font-medium">Default branch</th>
-                            <th class="pb-3 pr-4 font-medium">Status</th>
-                            <th class="pb-3 font-medium">Last synced</th>
+                            <th class="pb-3 pr-4 font-medium">Reviews</th>
+                            <th class="pb-3 pr-4 font-medium">Last synced</th>
+                            <th class="pb-3 font-medium">Enabled</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -106,11 +126,20 @@ defineOptions({
                             </td>
                             <td class="py-3 pr-4 text-muted-foreground">{{ repo.default_branch }}</td>
                             <td class="py-3 pr-4">
-                                <Badge v-if="repo.enabled" variant="secondary">Enabled</Badge>
-                                <Badge v-else variant="outline">Disabled</Badge>
+                                <Badge v-if="repo.enabled" variant="secondary">Active</Badge>
+                                <Badge v-else variant="outline">Inactive</Badge>
                             </td>
-                            <td class="py-3 text-muted-foreground">
+                            <td class="py-3 pr-4 text-muted-foreground">
                                 {{ repo.last_synced_at ?? 'Never' }}
+                            </td>
+                            <td class="py-3">
+                                <Button
+                                    size="sm"
+                                    :variant="repo.enabled ? 'destructive' : 'default'"
+                                    @click="toggleEnabled(repo)"
+                                >
+                                    {{ repo.enabled ? 'Disable' : 'Enable' }}
+                                </Button>
                             </td>
                         </tr>
                     </tbody>

@@ -236,20 +236,20 @@
   "hotPaths": [
     {
       "path": "app/Providers/AppServiceProvider.php",
-      "accessCount": 10,
-      "lastAccessed": 1778713941829,
+      "accessCount": 11,
+      "lastAccessed": 1778716647609,
+      "type": "file"
+    },
+    {
+      "path": "routes/web.php",
+      "accessCount": 9,
+      "lastAccessed": 1778716221329,
       "type": "file"
     },
     {
       "path": "app/Models/User.php",
       "accessCount": 8,
       "lastAccessed": 1778715737744,
-      "type": "file"
-    },
-    {
-      "path": "routes/web.php",
-      "accessCount": 6,
-      "lastAccessed": 1778714147416,
       "type": "file"
     },
     {
@@ -271,6 +271,12 @@
       "type": "file"
     },
     {
+      "path": "app/Concerns/WorkspaceContext.php",
+      "accessCount": 5,
+      "lastAccessed": 1778716636491,
+      "type": "file"
+    },
+    {
       "path": "config/queue.php",
       "accessCount": 4,
       "lastAccessed": 1778710225356,
@@ -283,15 +289,21 @@
       "type": "file"
     },
     {
-      "path": "app/Concerns/WorkspaceContext.php",
-      "accessCount": 4,
-      "lastAccessed": 1778715751362,
-      "type": "file"
-    },
-    {
       "path": "database/migrations/2026_05_13_000001_create_workspaces_table.php",
       "accessCount": 4,
       "lastAccessed": 1778715828811,
+      "type": "file"
+    },
+    {
+      "path": "database/migrations/2026_05_13_000003_create_repositories_table.php",
+      "accessCount": 4,
+      "lastAccessed": 1778716591071,
+      "type": "file"
+    },
+    {
+      "path": "app/Http/Middleware/HandleInertiaRequests.php",
+      "accessCount": 4,
+      "lastAccessed": 1778716690011,
       "type": "file"
     },
     {
@@ -310,12 +322,6 @@
       "path": "app/Models/Workspace.php",
       "accessCount": 3,
       "lastAccessed": 1778713968824,
-      "type": "file"
-    },
-    {
-      "path": "app/Http/Middleware/HandleInertiaRequests.php",
-      "accessCount": 3,
-      "lastAccessed": 1778714183817,
       "type": "file"
     },
     {
@@ -358,12 +364,6 @@
       "path": "database/migrations/2026_05_13_000002_create_workspace_user_table.php",
       "accessCount": 2,
       "lastAccessed": 1778710419789,
-      "type": "file"
-    },
-    {
-      "path": "database/migrations/2026_05_13_000003_create_repositories_table.php",
-      "accessCount": 2,
-      "lastAccessed": 1778710422733,
       "type": "file"
     },
     {

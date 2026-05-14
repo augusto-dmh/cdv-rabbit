@@ -15,7 +15,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('full_slug')->unique();
             $table->string('webhook_uuid')->nullable();
-            $table->string('webhook_token');
+            $table->string('webhook_token')->nullable();
             $table->string('default_branch');
             $table->timestamp('last_synced_at')->nullable();
             $table->boolean('enabled')->default(false);
