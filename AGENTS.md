@@ -6,10 +6,10 @@
 > file describes the target; the git log describes the past;
 > this file bridges them.
 
-- **Last updated:** 2026-05-13 (Phase 1 / Week 1 COMPLETE — tag `phase-1-complete`)
+- **Last updated:** 2026-05-14 (Phase 2 / Week 2 COMPLETE — tag `phase-2-complete`)
 - **Repo:** https://github.com/augusto-dmh/cdv-rabbit (private)
 - **Branch:** `main` only (trunk-based, no PR workflow yet)
-- **Test suite:** 69 tests, 210 assertions, all green on tag `phase-1-complete`
+- **Test suite:** 113 tests, 351 assertions, all green on tag `phase-2-complete`
 
 ---
 
@@ -62,9 +62,9 @@ from migration 0001.
 
 The plan runs 5 phases over 4–6 weeks:
 - **W1** domain model + Horizon/Redis + tenancy primitives — ✅ **COMPLETE** (tag `phase-1-complete`)
-- W2 Bitbucket integration layer — next, not started
-- W3 review pipeline (Claude + caching/streaming/tool_use) — not started
-- W4 Inertia UI — not started
+- **W2** Bitbucket integration layer — ✅ **COMPLETE** (tag `phase-2-complete`)
+- W3 review pipeline (Claude + caching/streaming/tool_use) — next, not started
+- W4 Inertia UI for reviews — not started (workspace UI shipped in W2)
 - W5 hardening + LGPD + observability — not started
 - W6 buffer / pilot — not started
 
@@ -103,18 +103,47 @@ Tag `phase-1-complete` applied. W2 is the next phase.
   `reviews`, `bitbucket-api`) in `config/horizon.php`.
 - `.env.example` carries Redis + Anthropic + Horizon env vars.
 
-### Next phase (W2) — Bitbucket integration layer
+### W2 task graph + status (all complete)
 
-Per plan §3 Week 2, the next phase delivers:
-- `app/Services/Bitbucket/BitbucketClient.php` (HTTP client wrapping
-  BB Cloud REST v2 with retry/backoff, rate-limit honoring).
-- `app/Http/Controllers/Bitbucket/WebhookController.php` (HMAC auth,
-  idempotency via `webhook_deliveries.bitbucket_uuid`, dispatch).
-- Workspace connect wizard pages (`resources/js/pages/workspaces/Connect.vue`).
-- Repository discovery + webhook auto-registration on enable.
+| ID | Title | Commit |
+|---|---|---|
+| W2-T1 | BitbucketClient service (HTTP wrapper for BB Cloud REST v2) | `cfd4599` |
+| W2-T2 | Webhook receiver — HMAC + idempotency + dispatch | `6b7f215` |
+| W2-T3 | Routes + EnsureWorkspaceMember middleware | `03b2145` |
+| W2-T4 | Workspace connect wizard backend | `7bdc0b8` |
+| W2-T5 | Workspace connect wizard UI (Inertia/Vue) | `760ce2d` |
+| W2-T6 | Repo sync + enable/disable + webhook lifecycle | `b2a4955` |
+| W2-T7 | Phase 2 Pest test pass + end-to-end smoke | (this commit) |
 
-W2 work has not started. Workers from W1 are idle/shut down. The
-next `/team` invocation will spin up a fresh team scoped to W2 tasks.
+Phase 2 verifier: 113 tests, 351 assertions, all green. Acceptance
+criteria covered: AC2 (idempotency end-to-end), AC15 partial (`/up`
+health endpoint returns 200), AC19 (HMAC primary auth on webhook).
+
+Tag `phase-2-complete` applied.
+
+### Next phase (W3) — Review pipeline (Claude + caching/streaming/tool_use)
+
+Per plan §3 Week 3 + §3.0 (Anthropic technical contract), W3 delivers:
+- `ReviewPullRequestJob::handle()` — real logic (currently a stub).
+  Diff stays in a local variable, never persisted (AC16/AC17).
+- `app/Services/Llm/{LlmDriverInterface, ClaudeReviewer}.php` with
+  prompt caching (`cache_control: ephemeral`), strict tool use
+  (`tool_choice: { type: "tool", name: "review_result" }`, `strict: true`),
+  streaming helper, XML untrusted-content wrapping (§3.0.5).
+- `app/Services/Llm/PromptBuilder.php` (XML wrapping per §3.0.5).
+- `app/Services/Llm/LlmCallTelemetry.php` (persists `reviews_llm_calls`
+  with 4 token-usage fields + request_id + rate-limit headers).
+- `app/Services/Review/{SkipRules, SecretRedactor, CommentSanitizer,
+  CommentPoster, DiffChunker, CostReservation}.php`.
+- `app/Support/AnthropicErrorClassifier.php` (maps HTTP+type → retry
+  policy per §3.0.7).
+- Frozen artifacts: `config/cdv-rabbit/prompts/review_v1.txt` +
+  `config/cdv-rabbit/schemas/review_result_v1.json` (AC23 enforces
+  schema freeze via snapshot test).
+- ACs added in W3: AC1, AC3, AC5, AC6, AC7, AC8, AC9, AC10, AC11,
+  AC20, AC21, AC22, AC23, AC24, AC25, AC26.
+
+W2 workers will be shut down before W3 team spins up.
 
 ---
 
