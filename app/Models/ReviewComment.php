@@ -10,11 +10,12 @@ use Database\Factories\ReviewCommentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ReviewComment extends Model
 {
     /** @use HasFactory<ReviewCommentFactory> */
-    use BelongsToWorkspace, HasFactory;
+    use BelongsToWorkspace, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'review_id',
