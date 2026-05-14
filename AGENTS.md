@@ -6,10 +6,10 @@
 > file describes the target; the git log describes the past;
 > this file bridges them.
 
-- **Last updated:** 2026-05-14 (Phase 2 complete; plan bumped to v1.4 for `laravel/ai` adoption)
+- **Last updated:** 2026-05-14 (Phase 3 COMPLETE — tag `phase-3-complete`; plan v1.4)
+- **Test suite:** 248 tests, 656 assertions, all green on tag `phase-3-complete`
 - **Repo:** https://github.com/augusto-dmh/cdv-rabbit (private)
 - **Branch:** `main` only (trunk-based, no PR workflow yet)
-- **Test suite:** 113 tests, 351 assertions, all green on tag `phase-2-complete`
 
 ---
 
@@ -40,21 +40,31 @@ from migration 0001.
    Pest 4 tests per change, no docs unless asked, no inline comments,
    Laravel Boost MCP preference.
 2. **This file (`AGENTS.md`)** — current state + reading order.
-3. **`.omc/plans/cdv-rabbit-mvp-minimal.md`** — authoritative plan,
-   v1.3, APPROVED WITH MINOR REVISIONS by two Critic passes. Read in
+3. **`specs/*.md`** — feature-level specifications (15-section
+   pattern from `specs/spec-artifacts-guidelines.md`, adapted from
+   the `../nexus` project's `spec-artifacts-guidelines.md`). Read
+   the spec for the feature you are about to touch BEFORE looking
+   at the implementation. Existing specs cover:
+   - `tenancy-and-workspace-isolation.md` (Phase 1)
+   - `lgpd-data-protection-posture.md` (Phase 1 + 3)
+   - `bitbucket-cloud-integration.md` (Phase 2)
+   - `ai-code-review-pipeline.md` (Phase 3)
+   - `cost-management-and-ceiling-alerts.md` (Phase 3)
+4. **`.omc/plans/cdv-rabbit-mvp-minimal.md`** — authoritative plan,
+   v1.4, APPROVED WITH MINOR REVISIONS by two Critic passes. Read in
    full when planning or implementing. Especially:
    - §1 Requirements summary (10 locked decisions).
    - §3.0 Anthropic API integration spec (locked technical contract).
    - §3 Implementation Plan week-by-week.
    - §4 Acceptance criteria (26 testable items).
    - §10 File layout (anticipated).
-4. **`git log --oneline`** — what's actually been delivered so far
-   (commit messages reference plan sections + AC numbers).
-5. **`.claude/skills/`** — domain skills loaded for this project
+5. **Git log** — what's actually been delivered. Commit messages
+   reference plan sections + AC numbers + spec files.
+6. **`.claude/skills/`** — domain skills loaded for this project
    (laravel-best-practices, pest-testing, inertia-vue-development,
    wayfinder-development, configuring-horizon, fortify-development,
-   tailwindcss-development). Activate them when the work touches the
-   matching domain.
+   tailwindcss-development, ai-sdk-development, claude-api).
+   Activate them when the work touches the matching domain.
 
 ---
 
@@ -63,8 +73,8 @@ from migration 0001.
 The plan runs 5 phases over 4–6 weeks:
 - **W1** domain model + Horizon/Redis + tenancy primitives — ✅ **COMPLETE** (tag `phase-1-complete`)
 - **W2** Bitbucket integration layer — ✅ **COMPLETE** (tag `phase-2-complete`)
-- W3 review pipeline (Claude + caching/streaming/tool_use) — next, not started
-- W4 Inertia UI for reviews — not started (workspace UI shipped in W2)
+- **W3** review pipeline (Claude via laravel/ai + caching/streaming/tool_use) — ✅ **COMPLETE** (tag `phase-3-complete`)
+- W4 Inertia UI for reviews — next, not started (workspace UI shipped in W2)
 - W5 hardening + LGPD + observability — not started
 - W6 buffer / pilot — not started
 
@@ -272,8 +282,46 @@ items (plan §11):
 
 ---
 
-## 10. Update protocol for this file
+## 10. Update protocol — AGENTS.md AND specs
 
 `AGENTS.md` is updated by `team-lead` at each phase boundary
 (W1 → W2, etc.) and after any locked-contract change. Workers do
 not edit it.
+
+### Spec maintenance (CRITICAL — modeled on nexus's spec-driven workflow)
+
+**Every implemented feature MUST have a corresponding `specs/*.md`
+document following the 15-section pattern in
+`specs/spec-artifacts-guidelines.md`.** This is non-negotiable. The
+specs are the single source of truth that AI agents, new engineers,
+and the DPO consult to understand what the system does, why, and
+how it satisfies LGPD/AC contracts.
+
+**When to update a spec:**
+- A new feature lands → write a new spec following the 15-section
+  template before merging the feature commits.
+- An existing feature changes behaviour, contracts, or scope → bump
+  the spec's version in §15 Change Log and update the affected
+  sections inline. Do NOT delete the prior change-log entry.
+- An AC is added/removed/renumbered → update §11 of the affected
+  specs.
+- A locked technical contract in this AGENTS.md §4 changes → update
+  the relevant spec(s) and AGENTS.md §4 in the same commit.
+- A pre-mortem scenario is added to the plan → cross-reference it
+  in §14 Risks of the affected spec(s).
+
+**Spec writing convention** (per `nexus-plan-feature` skill inspiration):
+- Filename: kebab-case, descriptive (`feature-area.md`).
+- 15 numbered sections in the exact order listed in
+  `specs/spec-artifacts-guidelines.md`.
+- Assumptions marked explicitly when filling gaps.
+- §11 Validation lists every AC the feature covers and the test
+  file(s) that prove it.
+- §15 Change Log entries reference commit SHAs and phase tags.
+
+**Where the spec is NOT the right artifact:**
+- Operational runbooks (deploy steps, on-call playbooks) — separate.
+- Plan-level cross-feature decisions — those live in
+  `.omc/plans/cdv-rabbit-mvp-minimal.md`.
+- Per-task implementation breakdowns — those live in the team task
+  list during a phase and are discarded after the phase tags.
