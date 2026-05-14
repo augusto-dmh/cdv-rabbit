@@ -171,6 +171,23 @@ class BitbucketClient
         return $response->json();
     }
 
+    public function updateComment(string $fullSlug, int $prNumber, int $commentId, string $content): array
+    {
+        $response = $this->request('PUT', "/repositories/{$fullSlug}/pullrequests/{$prNumber}/comments/{$commentId}", [
+            'content' => ['raw' => $content],
+        ]);
+        $this->captureRateLimitHeaders($response);
+
+        Log::channel('bitbucket')->info('updateComment', [
+            'full_slug' => $fullSlug,
+            'pr_number' => $prNumber,
+            'comment_id' => $commentId,
+            'status' => $response->status(),
+        ]);
+
+        return $response->json();
+    }
+
     public function registerWebhook(string $fullSlug, string $url, string $secret, array $events): array
     {
         $response = $this->request('POST', "/repositories/{$fullSlug}/hooks", [
