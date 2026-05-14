@@ -26,6 +26,8 @@ class WorkspaceFactory extends Factory
             'webhook_secret' => Str::random(40),
             'kill_switch_enabled' => false,
             'health' => 'healthy',
+            'daily_token_cap' => 200000,
+            'daily_token_cap_alert_threshold' => 70,
         ];
     }
 }

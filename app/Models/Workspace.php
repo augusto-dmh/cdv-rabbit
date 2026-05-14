@@ -27,6 +27,8 @@ class Workspace extends Model
         'webhook_secret',
         'kill_switch_enabled',
         'health',
+        'daily_token_cap',
+        'daily_token_cap_alert_threshold',
     ];
 
     protected function casts(): array

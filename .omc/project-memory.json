@@ -259,9 +259,15 @@
       "type": "file"
     },
     {
+      "path": "app/Models/Workspace.php",
+      "accessCount": 6,
+      "lastAccessed": 1778719571664,
+      "type": "file"
+    },
+    {
       "path": "tests/Unit/Queue/RedactingFailedJobProviderTest.php",
-      "accessCount": 5,
-      "lastAccessed": 1778710924835,
+      "accessCount": 6,
+      "lastAccessed": 1778719622152,
       "type": "file"
     },
     {
@@ -307,9 +313,15 @@
       "type": "file"
     },
     {
-      "path": "app/Models/Workspace.php",
+      "path": "database/factories/WorkspaceFactory.php",
       "accessCount": 4,
-      "lastAccessed": 1778717832167,
+      "lastAccessed": 1778719562266,
+      "type": "file"
+    },
+    {
+      "path": "phpunit.xml",
+      "accessCount": 4,
+      "lastAccessed": 1778719602879,
       "type": "file"
     },
     {
@@ -367,12 +379,6 @@
       "type": "file"
     },
     {
-      "path": "phpunit.xml",
-      "accessCount": 2,
-      "lastAccessed": 1778710256487,
-      "type": "file"
-    },
-    {
       "path": "database/migrations/2026_05_13_000002_create_workspace_user_table.php",
       "accessCount": 2,
       "lastAccessed": 1778710419789,
@@ -424,12 +430,6 @@
       "path": "routes/settings.php",
       "accessCount": 2,
       "lastAccessed": 1778714078514,
-      "type": "file"
-    },
-    {
-      "path": "database/factories/WorkspaceFactory.php",
-      "accessCount": 2,
-      "lastAccessed": 1778714191159,
       "type": "file"
     },
     {
