@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Reviews\ReviewController;
 use App\Http\Controllers\Workspaces\ConnectController;
 use App\Http\Controllers\Workspaces\RepositoryController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
@@ -26,6 +27,9 @@ Route::middleware(['auth', 'verified', 'workspace.member'])
         Route::get('repositories', [RepositoryController::class, 'index'])->name('workspaces.repositories.index');
         Route::post('repositories/sync', [RepositoryController::class, 'sync'])->name('workspaces.repositories.sync');
         Route::patch('repositories/{repository}', [RepositoryController::class, 'update'])->name('workspaces.repositories.update');
+
+        Route::get('reviews', [ReviewController::class, 'index'])->name('workspaces.reviews.index');
+        Route::get('reviews/{review}', [ReviewController::class, 'show'])->name('workspaces.reviews.show');
     });
 
 require __DIR__.'/settings.php';

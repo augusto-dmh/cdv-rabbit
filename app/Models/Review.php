@@ -44,6 +44,19 @@ class Review extends Model
         ];
     }
 
+    /**
+     * @return array<int, string>
+     */
+    protected function appends(): array
+    {
+        return [];
+    }
+
+    public function getCostUsdAttribute(): string
+    {
+        return '$'.number_format(($this->cost_usd_cents ?? 0) / 100, 4);
+    }
+
     /** @return BelongsTo<Repository, $this> */
     public function repository(): BelongsTo
     {

@@ -58,4 +58,10 @@ class Workspace extends Model
     {
         return $this->hasMany(Repository::class);
     }
+
+    /** @return HasMany<Review, $this> */
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
 }

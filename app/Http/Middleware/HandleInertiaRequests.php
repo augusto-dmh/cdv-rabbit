@@ -47,6 +47,7 @@ class HandleInertiaRequests extends Middleware
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
             'workspaces' => $this->resolveWorkspaces($request),
             'currentWorkspace' => $this->resolveCurrentWorkspace($request),
+            'currentWorkspaceKillSwitchEnabled' => $this->resolveKillSwitchEnabled($request),
         ];
     }
 
@@ -79,5 +80,17 @@ class HandleInertiaRequests extends Middleware
         }
 
         return ['id' => $workspace->id, 'name' => $workspace->name, 'slug' => $workspace->slug];
+    }
+
+    private function resolveKillSwitchEnabled(Request $request): ?bool
+    {
+        /** @var Workspace|null $workspace */
+        $workspace = $request->route('workspace');
+
+        if (! $workspace instanceof Workspace) {
+            return null;
+        }
+
+        return (bool) $workspace->kill_switch_enabled;
     }
 }
