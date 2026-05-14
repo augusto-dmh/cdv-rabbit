@@ -6,7 +6,7 @@
 > file describes the target; the git log describes the past;
 > this file bridges them.
 
-- **Last updated:** 2026-05-14 (Phase 2 / Week 2 COMPLETE — tag `phase-2-complete`)
+- **Last updated:** 2026-05-14 (Phase 2 complete; plan bumped to v1.4 for `laravel/ai` adoption)
 - **Repo:** https://github.com/augusto-dmh/cdv-rabbit (private)
 - **Branch:** `main` only (trunk-based, no PR workflow yet)
 - **Test suite:** 113 tests, 351 assertions, all green on tag `phase-2-complete`
@@ -121,9 +121,26 @@ health endpoint returns 200), AC19 (HMAC primary auth on webhook).
 
 Tag `phase-2-complete` applied.
 
-### Next phase (W3) — Review pipeline (Claude + caching/streaming/tool_use)
+### Next phase (W3) — Review pipeline (Claude via `laravel/ai`)
 
-Per plan §3 Week 3 + §3.0 (Anthropic technical contract), W3 delivers:
+Per plan §3 Week 3 + §3.0 (Anthropic technical contract) + §3.0.10
+(Laravel AI SDK integration strategy, v1.4 addition).
+
+**Foundation:** `composer require laravel/ai` (official Laravel 13
+package, https://laravel.com/docs/13.x/ai-sdk). Used as the primary
+abstraction for agent/provider plumbing, streaming, model routing,
+and the four token-usage fields. Drops to `providerOptions()` escape
+hatch for the three §3.0 contracts the SDK does not expose with
+first-class typed APIs:
+1. Strict tool use (`tool_choice: {type:"tool", name:"review_result"}` +
+   `strict: true` + `additionalProperties: false`) — passed via
+   `providerOptions()` raw payload.
+2. `request_id` + rate-limit headers — captured via a Guzzle
+   middleware attached to the underlying transport.
+3. Error taxonomy (429/529 retry, 400/401/413 terminal) — our
+   `AnthropicErrorClassifier` wraps the SDK exceptions.
+
+W3 delivers:
 - `ReviewPullRequestJob::handle()` — real logic (currently a stub).
   Diff stays in a local variable, never persisted (AC16/AC17).
 - `app/Services/Llm/{LlmDriverInterface, ClaudeReviewer}.php` with
