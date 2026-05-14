@@ -8,7 +8,9 @@ use App\Jobs\ReviewPullRequestJob;
 use App\Models\Repository;
 use App\Models\WebhookDelivery;
 use App\Models\Workspace;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -106,5 +108,16 @@ test('duplicate delivery: second POST with same X-Hook-UUID returns 200 and does
 });
 
 test('GET /up returns 200', function (): void {
+    Http::fake([
+        'https://api.bitbucket.org/*' => Http::response('', 200),
+        'https://api.anthropic.com/*' => Http::response('', 200),
+    ]);
+
+    $horizonMock = Mockery::mock();
+    $horizonMock->shouldReceive('zrevrangebyscore')->andReturn(['supervisor-1']);
+    $horizonMock->shouldReceive('zscore')->andReturn((string) time());
+    Redis::shouldReceive('ping')->andReturn('PONG');
+    Redis::shouldReceive('connection')->with('horizon')->andReturn($horizonMock);
+
     $this->get('/up')->assertStatus(200);
 });

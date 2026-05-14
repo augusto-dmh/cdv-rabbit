@@ -1,7 +1,7 @@
 # AC Coverage Index — cdv-rabbit MVP
 
 Maps each acceptance criterion (AC1–AC26) to its owning test file(s).
-Updated at Phase 4 completion (W4-T4).
+Updated at Phase 5 completion (W5-T5).
 
 | AC | Description (short) | Status | Owning test file(s) |
 |----|---------------------|--------|---------------------|
@@ -17,9 +17,9 @@ Updated at Phase 4 completion (W4-T4).
 | AC10 | Prompt-injection payload in diff is XML-escaped before LLM call | ✅ | `tests/Unit/Services/Llm/PromptBuilderTest.php`, `tests/Feature/Jobs/ReviewPullRequestJobTest.php` |
 | AC11 | Daily cost ceiling halts dispatch + sends alert email | ✅ | `tests/Feature/Review/CostReservationTest.php`, `tests/Feature/Jobs/ReviewPullRequestJobTest.php` |
 | AC12 | Cross-workspace query isolation (global scope enforced) | ✅ | `tests/Feature/Tenancy/CrossWorkspaceIsolationTest.php` |
-| AC13 | `php artisan rabbit:lgpd-check` returns exit 0 | 🔲 | Deferred to W5 (hardening phase) |
+| AC13 | `php artisan rabbit:lgpd-check` returns exit 0 | ✅ | `tests/Feature/Console/LgpdCheckCommandTest.php`, `tests/Feature/Phase5/Phase5HardeningSmokeTest.php` |
 | AC14 | Full test suite green on CI | ✅ | CI run / `php artisan test --compact` |
-| AC15 | Health endpoint `/up` returns 200 when healthy | ✅ | `tests/Feature/Bitbucket/EndToEndSmokeTest.php` |
+| AC15 | Health endpoint `/up` returns 200 when healthy | ✅ FULL | `tests/Feature/Health/HealthControllerTest.php`, `tests/Feature/Phase5/Phase5HardeningSmokeTest.php` |
 | AC16 | Serialized `ReviewPullRequestJob` contains zero diff content, < 2KB | ✅ | `tests/Unit/Jobs/JobSerializationLeakTest.php`, `tests/Feature/Jobs/ReviewPullRequestJobTest.php` |
 | AC17 | `failed_jobs.payload` after mid-handle throw contains zero diff lines | ✅ | `tests/Feature/Queue/FailedJobRedactionTest.php` |
 | AC18 | `BelongsToWorkspace` scope throws `WorkspaceContextMissingException` when unbound | ✅ | `tests/Feature/Tenancy/CrossWorkspaceIsolationTest.php`, `tests/Unit/Concerns/BelongsToWorkspaceTest.php` |
@@ -40,8 +40,14 @@ Updated at Phase 4 completion (W4-T4).
 | Phase4 UI smoke | Admin walks workspaces→show→reviews→review show→kill switch; all 200 | ✅ | `tests/Feature/Phase4/Phase4UiSmokeTest.php` |
 | Phase4 authorization | Unauthenticated redirects, non-member 403, cross-workspace 404 | ✅ | `tests/Feature/Phase4/UiAuthorizationTest.php` |
 | Phase4 sidebar nav | Shared props (currentWorkspace, killSwitchEnabled) correct by route | ✅ | `tests/Feature/Navigation/SidebarNavTest.php` |
+| Phase5 hardening smoke | End-to-end: posted review emits structured log; /up healthy; purge --dry-run; lgpd-check exit 0; RedactingProcessor strips forbidden keys | ✅ | `tests/Feature/Phase5/Phase5HardeningSmokeTest.php` |
+| Phase5 structured log | Per-review JSON log fields; RedactingProcessor; failed review log | ✅ | `tests/Feature/Logging/StructuredReviewLogTest.php` |
+| Phase5 health endpoint | DB/Redis/Horizon/Bitbucket/Anthropic checks; 200 healthy / 503 degraded | ✅ | `tests/Feature/Health/HealthControllerTest.php` |
+| Phase5 purge job | Soft-delete >365d; hard-delete >395d cascade; webhook_deliveries >90d; --dry-run; multi-workspace | ✅ | `tests/Feature/Console/PurgeStaleReviewsCommandTest.php` |
+| Phase5 lgpd-check | Schema audit; encryption casts; failed-jobs provider; redacting processor; retention schedule; DPO sign-off | ✅ | `tests/Feature/Console/LgpdCheckCommandTest.php` |
 
 ## Legend
 
 - ✅ Covered with passing test(s)
+- ✅ FULL Coverage upgraded from partial to full in W5
 - 🔲 Deferred: noted in plan with explicit rationale (W5 hardening or W6 live-API pilot)
