@@ -32,6 +32,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 class ReviewPullRequestJob implements ShouldQueue
@@ -87,6 +88,7 @@ class ReviewPullRequestJob implements ShouldQueue
                 'head_sha' => $this->headSha,
             ],
             [
+                'correlation_id' => Str::uuid()->toString(),
                 'base_sha' => '',
                 'status' => ReviewStatus::Queued,
                 'started_at' => null,
@@ -102,6 +104,7 @@ class ReviewPullRequestJob implements ShouldQueue
         if ($workspace->kill_switch_enabled || config('cdv-rabbit.killed')) {
             $review->update(['status' => ReviewStatus::Skipped, 'finished_at' => now()]);
             Log::info('ReviewPullRequestJob: kill switch enabled, skipping', ['review_id' => $review->id]);
+            $this->emitReviewLog($review->fresh());
 
             return;
         }
@@ -126,6 +129,7 @@ class ReviewPullRequestJob implements ShouldQueue
             ]);
 
             $costReservation->notifyIfThresholdExceeded($workspace, $reservation->consumed);
+            $this->emitReviewLog($review->fresh());
 
             return;
         }
@@ -140,6 +144,7 @@ class ReviewPullRequestJob implements ShouldQueue
                 $review->update(['status' => ReviewStatus::Skipped, 'finished_at' => now()]);
                 $costReservation->release($this->workspaceId, self::COST_RESERVATION_TOKENS);
                 Log::info('ReviewPullRequestJob: PR not open, skipping', ['review_id' => $review->id]);
+                $this->emitReviewLog($review->fresh());
 
                 return;
             }
@@ -168,6 +173,7 @@ class ReviewPullRequestJob implements ShouldQueue
                 $this->postSkippedSummary($bitbucket, $repoFullSlug, $review, 'This PR is too large to review automatically (> 8 000 changed lines).');
                 $review->update(['status' => ReviewStatus::Skipped, 'finished_at' => now()]);
                 $costReservation->release($this->workspaceId, self::COST_RESERVATION_TOKENS);
+                $this->emitReviewLog($review->fresh());
 
                 return;
             }
@@ -178,6 +184,7 @@ class ReviewPullRequestJob implements ShouldQueue
             if ($diff === null || trim($diff) === '') {
                 $review->update(['status' => ReviewStatus::Skipped, 'finished_at' => now()]);
                 $costReservation->release($this->workspaceId, self::COST_RESERVATION_TOKENS);
+                $this->emitReviewLog($review->fresh());
 
                 return;
             }
@@ -199,6 +206,7 @@ class ReviewPullRequestJob implements ShouldQueue
             if (count($fileDiffs) === 0) {
                 $review->update(['status' => ReviewStatus::Skipped, 'finished_at' => now()]);
                 $costReservation->release($this->workspaceId, self::COST_RESERVATION_TOKENS);
+                $this->emitReviewLog($review->fresh());
 
                 return;
             }
@@ -252,6 +260,7 @@ class ReviewPullRequestJob implements ShouldQueue
             ]);
 
             $costReservation->notifyIfThresholdExceeded($workspace, $costReservation->consumed($this->workspaceId));
+            $this->emitReviewLog($review->fresh());
 
         } catch (LlmReviewException $e) {
             $this->handleLlmException($e, $review, $bitbucket, $repoFullSlug, $costReservation);
@@ -269,6 +278,8 @@ class ReviewPullRequestJob implements ShouldQueue
                 'review_id' => $review->id,
                 'error' => $e->getMessage(),
             ]);
+
+            $this->emitReviewLog($review->fresh());
 
             throw $e;
         }
@@ -349,11 +360,45 @@ class ReviewPullRequestJob implements ShouldQueue
             'error' => $e->getMessage(),
         ]);
 
+        $this->emitReviewLog($review->fresh());
+
         if ($decision === RetryDecision::Terminal) {
             return; // Do not re-throw — mark failed and stop
         }
 
         throw $e; // RetryWithBackoff or PauseWorkspace → let Horizon retry/escalate
+    }
+
+    private function emitReviewLog(?Review $review): void
+    {
+        if ($review === null) {
+            return;
+        }
+
+        $llmCallsCount = $review->llmCalls()->count();
+
+        Log::channel('cdv-rabbit-reviews')->info('review.terminal', [
+            'correlation_id' => $review->correlation_id,
+            'workspace_id' => $review->workspace_id,
+            'repository_id' => $review->repository_id,
+            'pull_request_number' => $review->pull_request_number,
+            'head_sha' => substr((string) $review->head_sha, 0, 8),
+            'status' => $review->status?->value,
+            'started_at' => $review->started_at?->toIso8601String(),
+            'finished_at' => $review->finished_at?->toIso8601String(),
+            'duration_ms' => $review->started_at && $review->finished_at
+                ? (int) $review->started_at->diffInMilliseconds($review->finished_at)
+                : null,
+            'prompt_tokens' => $review->prompt_tokens,
+            'completion_tokens' => $review->completion_tokens,
+            'cost_usd_cents' => $review->cost_usd_cents,
+            'secrets_redacted' => $review->secrets_redacted,
+            'error_class' => $review->error_class,
+            'error_message' => $review->error_message !== null
+                ? substr($review->error_message, 0, 200)
+                : null,
+            'llm_calls_count' => $llmCallsCount,
+        ]);
     }
 
     /**

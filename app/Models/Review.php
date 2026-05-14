@@ -18,6 +18,7 @@ class Review extends Model
     use BelongsToWorkspace, HasFactory;
 
     protected $fillable = [
+        'correlation_id',
         'workspace_id',
         'repository_id',
         'pull_request_number',
