@@ -1,0 +1,55 @@
+{
+  "actor": {
+    "display_name": "Jane Dev",
+    "uuid": "{actor-uuid}",
+    "account_id": "557058:actor-account-id",
+    "type": "user"
+  },
+  "pullrequest": {
+    "id": 7,
+    "title": "Add awesome feature",
+    "description": "This PR adds an awesome feature.",
+    "state": "OPEN",
+    "created_on": "2026-05-13T10:00:00.000000+00:00",
+    "updated_on": "2026-05-13T10:00:00.000000+00:00",
+    "source": {
+      "branch": { "name": "feature/awesome" },
+      "commit": { "hash": "aabbccddeeff00112233445566778899aabbccdd" },
+      "repository": {
+        "full_name": "my-workspace/my-repo",
+        "name": "my-repo",
+        "uuid": "{repo-uuid}"
+      }
+    },
+    "destination": {
+      "branch": { "name": "main" },
+      "commit": { "hash": "1122334455667788990011223344556677889900" },
+      "repository": {
+        "full_name": "my-workspace/my-repo",
+        "name": "my-repo",
+        "uuid": "{repo-uuid}"
+      }
+    },
+    "author": {
+      "display_name": "Jane Dev",
+      "uuid": "{actor-uuid}",
+      "type": "user"
+    },
+    "reviewers": [],
+    "participants": [],
+    "links": {
+      "self": { "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/pullrequests/7" },
+      "html": { "href": "https://bitbucket.org/my-workspace/my-repo/pull-requests/7" }
+    }
+  },
+  "repository": {
+    "full_name": "my-workspace/my-repo",
+    "name": "my-repo",
+    "uuid": "{repo-uuid}",
+    "type": "repository",
+    "links": {
+      "self": { "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo" },
+      "html": { "href": "https://bitbucket.org/my-workspace/my-repo" }
+    }
+  }
+}
