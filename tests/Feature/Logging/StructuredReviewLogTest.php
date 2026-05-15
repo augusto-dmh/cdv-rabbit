@@ -100,6 +100,8 @@ function logTestBindFakeLlm(?Closure $callback = null): void
             return ($this->cb)($systemPrompt, $toolSchema, $userMessage);
         }
     });
+
+    bindFakeLlmFactory();
 }
 
 function logTestBindFakeClaudeReviewer(): void

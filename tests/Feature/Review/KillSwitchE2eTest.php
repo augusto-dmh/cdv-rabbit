@@ -48,6 +48,7 @@ test('AC8: kill switch on — job marks review skipped, no LLM call', function (
             throw new RuntimeException('LLM must not be called when kill switch is on');
         }
     });
+    bindFakeLlmFactory();
 
     app()->bind(CostReservationInterface::class, fn () => new FakeCostReservation(granted: true));
 
@@ -113,6 +114,7 @@ test('AC8: kill switch toggled on mid-flight stops next job dispatch', function 
             );
         }
     });
+    bindFakeLlmFactory();
     app()->bind(CostReservationInterface::class, fn () => new FakeCostReservation(granted: true));
 
     Http::fake([
@@ -180,6 +182,7 @@ test('AC8: kill switch toggled on mid-flight stops next job dispatch', function 
             throw new RuntimeException('Kill switch should have prevented this');
         }
     });
+    bindFakeLlmFactory();
 
     $jobOn = new ReviewPullRequestJob(
         workspaceId: $workspaceOn->id,

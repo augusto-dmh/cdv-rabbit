@@ -122,6 +122,7 @@ test('global env flag CDV_RABBIT_KILLED stops job from calling LLM', function ()
             throw new RuntimeException('LLM must not be called when global kill is active');
         }
     });
+    bindFakeLlmFactory();
 
     app()->bind(CostReservationInterface::class, fn () => new FakeCostReservation(granted: true));
     Http::fake(['*' => Http::response([])]);

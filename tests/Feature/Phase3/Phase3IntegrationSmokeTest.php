@@ -114,6 +114,7 @@ test('Phase3 smoke: 3-file PR — binary + lock skipped, normal file reviewed', 
             );
         }
     });
+    bindFakeLlmFactory();
 
     // Fake telemetry — no-op so we skip DB write complexity in this smoke
     app()->bind(LlmCallTelemetry::class, fn () => new class

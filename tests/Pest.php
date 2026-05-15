@@ -1,5 +1,7 @@
 <?php
 
+use App\Services\Llm\LlmDriverFactory;
+use App\Services\Llm\LlmDriverInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -47,4 +49,19 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Bind LlmDriverFactory so make() delegates to whatever LlmDriverInterface is bound.
+ * Call this after binding LlmDriverInterface in tests that dispatch ReviewPullRequestJob.
+ */
+function bindFakeLlmFactory(): void
+{
+    app()->bind(LlmDriverFactory::class, fn () => new class
+    {
+        public function make(mixed $workspace): LlmDriverInterface
+        {
+            return app(LlmDriverInterface::class);
+        }
+    });
 }

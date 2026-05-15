@@ -156,6 +156,8 @@ function bindFakeLlm(?Closure $callback = null): void
             return ($this->cb)($systemPrompt, $toolSchema, $userMessage);
         }
     });
+
+    bindFakeLlmFactory();
 }
 
 /**

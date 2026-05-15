@@ -18,7 +18,7 @@ use App\Services\Llm\Dto\ReviewCommentDto;
 use App\Services\Llm\Dto\ReviewResultDto;
 use App\Services\Llm\Dto\ReviewSummaryDto;
 use App\Services\Llm\LlmCallTelemetry;
-use App\Services\Llm\LlmDriverInterface;
+use App\Services\Llm\LlmDriverFactory;
 use App\Services\Llm\LlmReviewException;
 use App\Services\Llm\PromptBuilder;
 use App\Services\Review\CommentPoster;
@@ -57,7 +57,6 @@ class ReviewPullRequestJob implements ShouldQueue
 
     public function handle(
         BitbucketClient $bitbucket,
-        LlmDriverInterface $llm,
         CostReservationInterface $costReservation,
         DiffChunker $chunker,
         SecretRedactor $redactor,
@@ -76,6 +75,9 @@ class ReviewPullRequestJob implements ShouldQueue
 
             return;
         }
+
+        $llm = app(LlmDriverFactory::class)->make($workspace);
+        $provider = $workspace->llm_provider;
 
         $repoFullSlug = $repository->full_slug;
 

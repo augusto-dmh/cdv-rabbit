@@ -105,6 +105,7 @@ function phase5BindFakes(): void
             return phase5ReviewResultDto();
         }
     });
+    bindFakeLlmFactory();
 
     app()->bind(ClaudeReviewer::class, fn () => new class
     {
