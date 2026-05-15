@@ -61,10 +61,16 @@ class RepositoryController extends Controller
     {
         $enabling = (bool) $request->validated('enabled');
 
-        if ($enabling && ! $repository->enabled) {
-            $this->enableRepository($workspace, $repository);
-        } elseif (! $enabling && $repository->enabled) {
-            $this->disableRepository($workspace, $repository);
+        try {
+            if ($enabling && ! $repository->enabled) {
+                $this->enableRepository($workspace, $repository);
+            } elseif (! $enabling && $repository->enabled) {
+                $this->disableRepository($workspace, $repository);
+            }
+        } catch (\RuntimeException $e) {
+            Inertia::flash('toast', ['type' => 'error', 'message' => $e->getMessage()]);
+
+            return to_route('workspaces.show', $workspace->slug);
         }
 
         return to_route('workspaces.show', $workspace->slug);

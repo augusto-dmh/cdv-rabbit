@@ -208,7 +208,13 @@ class BitbucketClient
             'status' => $response->status(),
         ]);
 
-        return $response->json();
+        if ($response->failed()) {
+            throw new \RuntimeException(
+                "Bitbucket webhook registration failed ({$response->status()}): {$response->body()}"
+            );
+        }
+
+        return $response->json() ?? [];
     }
 
     public function deleteWebhook(string $fullSlug, string $webhookUuid): bool
