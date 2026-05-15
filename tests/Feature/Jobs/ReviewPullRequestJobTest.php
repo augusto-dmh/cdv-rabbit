@@ -141,6 +141,16 @@ function bindFakeLlm(?Closure $callback = null): void
     {
         public function __construct(private Closure $cb) {}
 
+        public function getSystemPrompt(): string
+        {
+            return '';
+        }
+
+        public function getToolSchema(): array
+        {
+            return [];
+        }
+
         public function reviewDiff(string $systemPrompt, array $toolSchema, string $userMessage, array $options = []): ReviewResultDto
         {
             return ($this->cb)($systemPrompt, $toolSchema, $userMessage);

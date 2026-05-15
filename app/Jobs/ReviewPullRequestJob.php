@@ -14,7 +14,6 @@ use App\Models\ReviewComment;
 use App\Models\Workspace;
 use App\Queue\BindWorkspaceMiddleware;
 use App\Services\Bitbucket\BitbucketClient;
-use App\Services\Llm\ClaudeReviewer;
 use App\Services\Llm\Dto\ReviewCommentDto;
 use App\Services\Llm\Dto\ReviewResultDto;
 use App\Services\Llm\Dto\ReviewSummaryDto;
@@ -217,11 +216,8 @@ class ReviewPullRequestJob implements ShouldQueue
             $totalInputTokens = 0;
             $totalOutputTokens = 0;
 
-            // Load prompt/schema from ClaudeReviewer (concrete methods not on interface — access via app binding)
-            /** @var ClaudeReviewer $concreteReviewer */
-            $concreteReviewer = app(ClaudeReviewer::class);
-            $systemPrompt = $concreteReviewer->getSystemPrompt();
-            $toolSchema = $concreteReviewer->getToolSchema();
+            $systemPrompt = $llm->getSystemPrompt();
+            $toolSchema = $llm->getToolSchema();
 
             foreach ($fileDiffs as $fileDiff) {
                 $redactionResult = $redactor->redact($fileDiff->hunks);

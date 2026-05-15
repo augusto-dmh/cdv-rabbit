@@ -12,4 +12,9 @@ interface LlmDriverInterface
         string $userMessage,
         array $options = [],
     ): ReviewResultDto;
+
+    public function getSystemPrompt(): string;
+
+    /** @return array<string, mixed> */
+    public function getToolSchema(): array;
 }

@@ -106,6 +106,16 @@ test('global env flag CDV_RABBIT_KILLED stops job from calling LLM', function ()
     {
         public function __construct(private bool &$called) {}
 
+        public function getSystemPrompt(): string
+        {
+            return '';
+        }
+
+        public function getToolSchema(): array
+        {
+            return [];
+        }
+
         public function reviewDiff(string $sp, array $ts, string $msg, array $opts = []): never
         {
             $this->called = true;

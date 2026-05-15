@@ -32,6 +32,16 @@ test('AC8: kill switch on — job marks review skipped, no LLM call', function (
     {
         public function __construct(private bool &$called) {}
 
+        public function getSystemPrompt(): string
+        {
+            return '';
+        }
+
+        public function getToolSchema(): array
+        {
+            return [];
+        }
+
         public function reviewDiff(string $sp, array $ts, string $msg, array $opts = []): never
         {
             $this->called = true;
@@ -74,6 +84,16 @@ test('AC8: kill switch toggled on mid-flight stops next job dispatch', function 
     app()->bind(LlmDriverInterface::class, fn () => new class($llmCalledOff) implements LlmDriverInterface
     {
         public function __construct(private bool &$called) {}
+
+        public function getSystemPrompt(): string
+        {
+            return '';
+        }
+
+        public function getToolSchema(): array
+        {
+            return [];
+        }
 
         public function reviewDiff(string $sp, array $ts, string $msg, array $opts = []): ReviewResultDto
         {
@@ -143,6 +163,16 @@ test('AC8: kill switch toggled on mid-flight stops next job dispatch', function 
     app()->bind(LlmDriverInterface::class, fn () => new class($llmCalledOn) implements LlmDriverInterface
     {
         public function __construct(private bool &$called) {}
+
+        public function getSystemPrompt(): string
+        {
+            return '';
+        }
+
+        public function getToolSchema(): array
+        {
+            return [];
+        }
 
         public function reviewDiff(string $sp, array $ts, string $msg, array $opts = []): never
         {

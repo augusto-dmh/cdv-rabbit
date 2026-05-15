@@ -90,6 +90,16 @@ function phase5BindFakes(): void
 
     app()->bind(LlmDriverInterface::class, fn () => new class implements LlmDriverInterface
     {
+        public function getSystemPrompt(): string
+        {
+            return '';
+        }
+
+        public function getToolSchema(): array
+        {
+            return [];
+        }
+
         public function reviewDiff(string $sp, array $ts, string $msg, array $opts = []): ReviewResultDto
         {
             return phase5ReviewResultDto();

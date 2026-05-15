@@ -84,6 +84,16 @@ test('Phase3 smoke: 3-file PR — binary + lock skipped, normal file reviewed', 
     {
         public function __construct(private int &$count) {}
 
+        public function getSystemPrompt(): string
+        {
+            return '';
+        }
+
+        public function getToolSchema(): array
+        {
+            return [];
+        }
+
         public function reviewDiff(string $sp, array $ts, string $msg, array $opts = []): ReviewResultDto
         {
             $this->count++;
