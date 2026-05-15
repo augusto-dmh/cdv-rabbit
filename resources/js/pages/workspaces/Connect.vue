@@ -148,14 +148,18 @@ defineOptions({
                 </div>
 
                 <div class="grid gap-2">
-                    <Label for="bitbucket_service_account">Service account username</Label>
+                    <Label for="bitbucket_service_account">Atlassian account email</Label>
                     <Input
                         id="bitbucket_service_account"
                         name="bitbucket_service_account"
+                        type="email"
                         :default-value="workspace.bitbucket_service_account ?? ''"
-                        placeholder="svc-cdv-rabbit"
+                        placeholder="service-account@example.com"
                         required
                     />
+                    <p class="text-xs text-muted-foreground">
+                        Email of the Atlassian account that owns the API token. Used with the token as HTTP Basic auth.
+                    </p>
                     <InputError :message="errors.bitbucket_service_account" />
                 </div>
 

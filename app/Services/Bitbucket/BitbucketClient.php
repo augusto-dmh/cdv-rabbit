@@ -15,6 +15,8 @@ class BitbucketClient
 {
     private string $token;
 
+    private ?string $serviceAccount;
+
     private string $workspaceSlug;
 
     private string $baseUrl;
@@ -24,6 +26,7 @@ class BitbucketClient
     public function __construct(Workspace $workspace)
     {
         $this->token = $workspace->bitbucket_token;
+        $this->serviceAccount = $workspace->bitbucket_service_account;
         $this->workspaceSlug = $workspace->bitbucket_workspace_slug;
         $this->baseUrl = rtrim((string) config('services.bitbucket.base_url', 'https://api.bitbucket.org/2.0'), '/');
     }
@@ -229,7 +232,7 @@ class BitbucketClient
 
     private function request(string $method, string $path, array $json = []): Response
     {
-        $pending = Http::withToken($this->token)
+        $pending = Http::withBasicAuth((string) $this->serviceAccount, $this->token)
             ->timeout(30)
             ->retry(3, 0, function (\Exception $exception, PendingRequest $request): bool {
                 if (! $exception instanceof RequestException) {

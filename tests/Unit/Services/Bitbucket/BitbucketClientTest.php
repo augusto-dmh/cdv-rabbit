@@ -10,16 +10,17 @@ use Tests\TestCase;
 
 uses(TestCase::class);
 
-function makeFakeWorkspace(string $token = 'test-token', string $slug = 'my-workspace'): Workspace
+function makeFakeWorkspace(string $token = 'test-token', string $slug = 'my-workspace', string $email = 'svc@example.com'): Workspace
 {
     $workspace = Mockery::mock(Workspace::class)->makePartial();
     $workspace->bitbucket_token = $token;
     $workspace->bitbucket_workspace_slug = $slug;
+    $workspace->bitbucket_service_account = $email;
 
     return $workspace;
 }
 
-test('me sends bearer token and returns user data', function (): void {
+test('me sends basic auth and returns user data', function (): void {
     Http::fake([
         'api.bitbucket.org/2.0/user' => Http::response(['uuid' => '{abc-123}', 'display_name' => 'Test User'], 200),
     ]);
@@ -30,8 +31,10 @@ test('me sends bearer token and returns user data', function (): void {
     expect($result)->toHaveKey('uuid');
     expect($result['display_name'])->toBe('Test User');
 
+    $expected = 'Basic '.base64_encode('svc@example.com:test-token');
+
     Http::assertSent(fn (Request $request) => str_contains($request->url(), '/user')
-        && $request->hasHeader('Authorization', 'Bearer test-token'));
+        && $request->hasHeader('Authorization', $expected));
 });
 
 test('listRepositories returns paginated results merged into single array', function (): void {

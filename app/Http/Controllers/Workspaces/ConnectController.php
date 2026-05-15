@@ -35,6 +35,7 @@ class ConnectController extends Controller
 
         $workspace->bitbucket_token = $validated['bitbucket_token'];
         $workspace->bitbucket_workspace_slug = $validated['bitbucket_workspace_slug'];
+        $workspace->bitbucket_service_account = $validated['bitbucket_service_account'];
 
         $client = new BitbucketClient($workspace);
 
@@ -46,7 +47,6 @@ class ConnectController extends Controller
             ]);
         }
 
-        $workspace->bitbucket_service_account = $validated['bitbucket_service_account'];
         $workspace->save();
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Bitbucket workspace connected.')]);
