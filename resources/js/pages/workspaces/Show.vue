@@ -63,7 +63,7 @@ function toggleEnabled(repo: Repository): void {
 
 function updateProvider(provider: string): void {
     router.patch(
-        update.url(props.workspace.id),
+        update.url(props.workspace.slug),
         { llm_provider: provider },
         { preserveScroll: true },
     );

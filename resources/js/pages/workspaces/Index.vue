@@ -60,7 +60,7 @@ defineOptions({
                     <p class="text-sm text-muted-foreground">{{ workspace.slug }}</p>
                     <div class="flex gap-2">
                         <Button as-child size="sm" variant="default">
-                            <Link :href="WorkspaceController.show.url(workspace.id)">Open</Link>
+                            <Link :href="WorkspaceController.show.url(workspace.slug)">Open</Link>
                         </Button>
                         <Button as-child size="sm" variant="outline">
                             <Link :href="ConnectController.edit.url(workspace.slug)">Connect</Link>

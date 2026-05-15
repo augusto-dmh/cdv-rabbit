@@ -183,7 +183,7 @@ defineOptions({
 
             <div class="flex gap-3">
                 <Button as-child variant="default">
-                    <Link :href="show.url(workspace.id)">View workspace</Link>
+                    <Link :href="show.url(workspace.slug)">View workspace</Link>
                 </Button>
                 <Button type="button" variant="outline" @click="step = 2">Update credentials</Button>
             </div>
