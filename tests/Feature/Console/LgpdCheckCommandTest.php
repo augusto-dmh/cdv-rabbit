@@ -276,3 +276,44 @@ it('fails DPO sign-off check when signer is missing', function (): void {
 
     $this->artisan('rabbit:lgpd-check')->assertFailed();
 });
+
+// ---------------------------------------------------------------------------
+// OpenAI DPA URL (check #9)
+// ---------------------------------------------------------------------------
+
+it('check 9 passes when no workspaces use openai', function (): void {
+    config([
+        'cdv-rabbit.anthropic_dpa_url' => 'https://anthropic.com/dpa',
+        'cdv-rabbit.openai_dpa_url' => null,
+        'cdv-rabbit.dpo_signoff_path' => dpoSignoffPath(),
+    ]);
+    writeDpoSignoff();
+
+    $this->artisan('rabbit:lgpd-check')->assertSuccessful();
+});
+
+it('check 9 fails when openai workspace exists and dpa url is missing', function (): void {
+    Workspace::factory()->create(['llm_provider' => 'openai']);
+
+    config([
+        'cdv-rabbit.anthropic_dpa_url' => 'https://anthropic.com/dpa',
+        'cdv-rabbit.openai_dpa_url' => null,
+        'cdv-rabbit.dpo_signoff_path' => dpoSignoffPath(),
+    ]);
+    writeDpoSignoff();
+
+    $this->artisan('rabbit:lgpd-check')->assertFailed();
+});
+
+it('check 9 passes when openai workspace exists and dpa url is set', function (): void {
+    Workspace::factory()->create(['llm_provider' => 'openai']);
+
+    config([
+        'cdv-rabbit.anthropic_dpa_url' => 'https://anthropic.com/dpa',
+        'cdv-rabbit.openai_dpa_url' => 'https://openai.com/dpa',
+        'cdv-rabbit.dpo_signoff_path' => dpoSignoffPath(),
+    ]);
+    writeDpoSignoff();
+
+    $this->artisan('rabbit:lgpd-check')->assertSuccessful();
+});

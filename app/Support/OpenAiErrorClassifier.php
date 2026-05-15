@@ -53,7 +53,7 @@ final class OpenAiErrorClassifier
         return match (true) {
             $status === 429 => RetryDecision::RetryWithBackoff,
             $status >= 500 => RetryDecision::RetryWithBackoff,
-            default => RetryDecision::Abort,
+            default => RetryDecision::Terminal,
         };
     }
 

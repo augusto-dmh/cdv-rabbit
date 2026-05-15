@@ -26,6 +26,7 @@ function mockHealthyHttp(): void
     Http::fake([
         'https://api.bitbucket.org/*' => Http::response('', 200),
         'https://api.anthropic.com/*' => Http::response('', 200),
+        'https://api.openai.com/*' => Http::response('', 200),
     ]);
 }
 
@@ -45,6 +46,7 @@ test('returns 200 with healthy status when all deps are up', function (): void {
                 'horizon' => ['ok', 'duration_ms', 'supervisor_age_seconds'],
                 'bitbucket_api' => ['ok', 'duration_ms'],
                 'anthropic_api' => ['ok', 'duration_ms'],
+                'openai_api' => ['ok', 'duration_ms'],
             ],
             'version',
         ]);
@@ -148,6 +150,7 @@ test('returns 401 from bitbucket as healthy because service is reachable', funct
     Http::fake([
         'https://api.bitbucket.org/*' => Http::response('', 401),
         'https://api.anthropic.com/*' => Http::response('', 200),
+        'https://api.openai.com/*' => Http::response('', 200),
     ]);
     mockHealthyRedis();
 

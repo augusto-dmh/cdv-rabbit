@@ -31,6 +31,11 @@ Updated at Phase 5 completion (W5-T5).
 | AC24 | XML-injection in diff is escaped (`<` → `&lt;`) before envelope | ✅ | `tests/Unit/Services/Llm/PromptBuilderTest.php` |
 | AC25 | 400/401/402/403/404/413 terminal; 429/5xx/529 retried with backoff | ✅ | `tests/Feature/Llm/ClaudeReviewerTest.php`, `tests/Feature/Jobs/ReviewPullRequestJobTest.php` |
 | AC26 | Empty comments + risk_level=low → summary only, status=posted | ✅ | `tests/Feature/Services/Review/CommentPosterTest.php` |
+| AC27 | `llm_provider` can be switched to openai/anthropic via PATCH; invalid value rejected | ✅ | `tests/Feature/Workspaces/LlmProviderSwitchTest.php`, `tests/Feature/Llm/OpenAiReviewerTest.php`, `tests/Feature/Jobs/ReviewPullRequestJobWithOpenAiTest.php` |
+| AC28 | `rabbit:lgpd-check` fails when an openai workspace exists but `OPENAI_DPA_URL` is unset | ✅ | `tests/Feature/Console/LgpdCheckCommandTest.php` (check #9) |
+| AC29 | OpenAI 429 rate_limit_exceeded → RetryWithBackoff; insufficient_quota/context_length_exceeded → Terminal | ✅ | `tests/Feature/Llm/OpenAiReviewerTest.php`, `tests/Feature/Jobs/ReviewPullRequestJobWithOpenAiTest.php` |
+| AC30 | OpenAI Terminal error marks review failed without re-throw; RetryWithBackoff re-throws for Horizon retry | ✅ | `tests/Feature/Jobs/ReviewPullRequestJobWithOpenAiTest.php` |
+| AC31 | Health endpoint `/up` includes `openai_api` check; 401 from OpenAI treated as healthy | ✅ | `tests/Feature/Health/HealthControllerTest.php` |
 
 ## Cross-cutting integration
 
@@ -45,6 +50,7 @@ Updated at Phase 5 completion (W5-T5).
 | Phase5 health endpoint | DB/Redis/Horizon/Bitbucket/Anthropic checks; 200 healthy / 503 degraded | ✅ | `tests/Feature/Health/HealthControllerTest.php` |
 | Phase5 purge job | Soft-delete >365d; hard-delete >395d cascade; webhook_deliveries >90d; --dry-run; multi-workspace | ✅ | `tests/Feature/Console/PurgeStaleReviewsCommandTest.php` |
 | Phase5 lgpd-check | Schema audit; encryption casts; failed-jobs provider; redacting processor; retention schedule; DPO sign-off | ✅ | `tests/Feature/Console/LgpdCheckCommandTest.php` |
+| OpenAI provider | OpenAI reviewer happy path, error classification, comment cap, job integration, DPA gate, health check | ✅ | `tests/Feature/Llm/OpenAiReviewerTest.php`, `tests/Feature/Jobs/ReviewPullRequestJobWithOpenAiTest.php`, `tests/Feature/Workspaces/LlmProviderSwitchTest.php` |
 
 ## Legend
 
