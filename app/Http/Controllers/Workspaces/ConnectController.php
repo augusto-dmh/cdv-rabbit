@@ -10,6 +10,7 @@ use App\Models\Workspace;
 use App\Services\Bitbucket\BitbucketClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -45,6 +46,10 @@ class ConnectController extends Controller
             return back()->withErrors([
                 'bitbucket_token' => __('Token is invalid or missing required Bitbucket scopes.'),
             ]);
+        }
+
+        if (empty($workspace->webhook_secret)) {
+            $workspace->webhook_secret = Str::random(40);
         }
 
         $workspace->save();
