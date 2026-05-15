@@ -31,6 +31,7 @@ type Review = {
 
 type LlmCall = {
     id: number;
+    provider: string | null;
     model_id: string;
     role: string | null;
     input_tokens: number;
@@ -210,6 +211,10 @@ return 'secondary';
                         <span class="text-muted-foreground">Cost</span>
                         <span class="font-medium">{{ review.cost_usd }}</span>
                     </div>
+                    <div v-if="llmCalls.length > 0 && llmCalls[0].provider" class="flex justify-between">
+                        <span class="text-muted-foreground">Provider</span>
+                        <span class="font-mono text-xs">{{ llmCalls[0].provider }} · {{ llmCalls[0].model_id }}</span>
+                    </div>
                     <div v-if="(review.secrets_redacted ?? 0) > 0" class="flex justify-between text-amber-600 dark:text-amber-400">
                         <span>Secrets redacted</span>
                         <span>{{ review.secrets_redacted }}</span>
@@ -226,6 +231,7 @@ return 'secondary';
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b text-left text-muted-foreground">
+                            <th class="px-4 py-3 font-medium">Provider</th>
                             <th class="px-4 py-3 font-medium">Model</th>
                             <th class="px-4 py-3 font-medium">Role</th>
                             <th class="px-4 py-3 font-medium">Input</th>
@@ -243,6 +249,9 @@ return 'secondary';
                             class="border-b last:border-0"
                             :class="{ 'bg-destructive/5': call.error_type }"
                         >
+                            <td class="px-4 py-3 text-muted-foreground">
+                                <span class="font-mono text-xs">{{ call.provider ?? '—' }}</span>
+                            </td>
                             <td class="px-4 py-3">
                                 <span class="font-mono text-xs">{{ call.model_id }}</span>
                             </td>

@@ -51,9 +51,15 @@ class WorkspaceController extends Controller
             $context->clear();
         }
 
+        $isAdmin = $workspace->users()
+            ->where('user_id', $request->user()->id)
+            ->where('role', 'admin')
+            ->exists();
+
         return Inertia::render('workspaces/Show', [
             'workspace' => $workspace,
             'repositories' => $repositories,
+            'isAdmin' => $isAdmin,
         ]);
     }
 
@@ -84,7 +90,8 @@ class WorkspaceController extends Controller
         }
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => ['sometimes', 'string', 'max:255'],
+            'llm_provider' => ['sometimes', 'in:anthropic,openai'],
         ]);
 
         $workspace->update($validated);

@@ -3,11 +3,12 @@ import { Form, Head, Link, router } from '@inertiajs/vue3';
 import { ExternalLink, RefreshCw } from 'lucide-vue-next';
 import ConnectController from '@/actions/App/Http/Controllers/Workspaces/ConnectController';
 import RepositoryController from '@/actions/App/Http/Controllers/Workspaces/RepositoryController';
-import { index } from '@/actions/App/Http/Controllers/Workspaces/WorkspaceController';
+import { index, update } from '@/actions/App/Http/Controllers/Workspaces/WorkspaceController';
 import Heading from '@/components/Heading.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type Repository = {
     id: number;
@@ -24,6 +25,7 @@ type Workspace = {
     slug: string;
     health: string;
     kill_switch_enabled: boolean;
+    llm_provider: string;
     bitbucket_workspace_slug: string | null;
     bitbucket_service_account: string | null;
 };
@@ -31,6 +33,7 @@ type Workspace = {
 type Props = {
     workspace: Workspace;
     repositories: Repository[];
+    isAdmin: boolean;
 };
 
 const props = defineProps<Props>();
@@ -57,6 +60,14 @@ function toggleEnabled(repo: Repository): void {
         { preserveScroll: true },
     );
 }
+
+function updateProvider(provider: string): void {
+    router.patch(
+        update.url(props.workspace.id),
+        { llm_provider: provider },
+        { preserveScroll: true },
+    );
+}
 </script>
 
 <template>
@@ -78,6 +89,24 @@ function toggleEnabled(repo: Repository): void {
                 <Link :href="ConnectController.edit.url(workspace.slug)">Manage connection</Link>
             </Button>
         </div>
+
+        <Card v-if="isAdmin">
+            <CardHeader>
+                <CardTitle class="text-sm font-medium">AI Provider</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-2">
+                <p class="text-sm text-muted-foreground">Select the LLM provider for new reviews. Applies to new reviews only; in-flight reviews complete on the previous provider.</p>
+                <Select :default-value="workspace.llm_provider" @update:model-value="updateProvider">
+                    <SelectTrigger class="w-56">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="anthropic">Anthropic Claude</SelectItem>
+                        <SelectItem value="openai">OpenAI GPT</SelectItem>
+                    </SelectContent>
+                </Select>
+            </CardContent>
+        </Card>
 
         <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0">
