@@ -6,6 +6,9 @@ use App\Concerns\WorkspaceContext;
 use App\Models\Repository;
 use App\Models\Workspace;
 use App\Queue\RedactingFailedJobProvider;
+use App\Services\Llm\ClaudeReviewer;
+use App\Services\Llm\LlmDriverFactory;
+use App\Services\Llm\LlmDriverInterface;
 use App\Services\Review\CostReservation;
 use App\Services\Review\CostReservationInterface;
 use Carbon\CarbonImmutable;
@@ -25,6 +28,8 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(WorkspaceContext::class);
         $this->app->bind(CostReservationInterface::class, CostReservation::class);
+        $this->app->bind(LlmDriverInterface::class, ClaudeReviewer::class);
+        $this->app->singleton(LlmDriverFactory::class);
     }
 
     // QueueServiceProvider is deferred — it registers queue.failer lazily. Using extend()
