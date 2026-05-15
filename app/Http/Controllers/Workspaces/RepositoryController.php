@@ -72,6 +72,10 @@ class RepositoryController extends Controller
 
     private function enableRepository(Workspace $workspace, Repository $repository): void
     {
+        if (empty($workspace->webhook_secret)) {
+            $workspace->update(['webhook_secret' => Str::random(40)]);
+        }
+
         $webhookToken = Str::random(40);
 
         $client = new BitbucketClient($workspace);
