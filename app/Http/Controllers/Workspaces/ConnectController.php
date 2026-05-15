@@ -40,7 +40,13 @@ class ConnectController extends Controller
 
         $client = new BitbucketClient($workspace);
 
-        $me = $client->me();
+        try {
+            $me = $client->me();
+        } catch (\RuntimeException $e) {
+            return back()->withErrors([
+                'bitbucket_token' => $e->getMessage(),
+            ]);
+        }
 
         if (empty($me['account_id'])) {
             return back()->withErrors([

@@ -39,7 +39,7 @@ class BitbucketClient
 
         Log::channel('bitbucket')->info('me', ['status' => $response->status()]);
 
-        return $response->json();
+        return $this->jsonOrFail($response, 'me');
     }
 
     public function listRepositories(): array
@@ -149,7 +149,7 @@ class BitbucketClient
             'status' => $response->status(),
         ]);
 
-        return $response->json();
+        return $this->jsonOrFail($response, 'postPullRequestComment');
     }
 
     public function postInlineComment(string $fullSlug, int $prNumber, string $content, string $path, int $line): array
@@ -171,7 +171,7 @@ class BitbucketClient
             'status' => $response->status(),
         ]);
 
-        return $response->json();
+        return $this->jsonOrFail($response, 'postInlineComment');
     }
 
     public function updateComment(string $fullSlug, int $prNumber, int $commentId, string $content): array
@@ -188,7 +188,7 @@ class BitbucketClient
             'status' => $response->status(),
         ]);
 
-        return $response->json();
+        return $this->jsonOrFail($response, 'updateComment');
     }
 
     public function registerWebhook(string $fullSlug, string $url, string $secret, array $events): array
@@ -208,13 +208,7 @@ class BitbucketClient
             'status' => $response->status(),
         ]);
 
-        if ($response->failed()) {
-            throw new \RuntimeException(
-                "Bitbucket webhook registration failed ({$response->status()}): {$response->body()}"
-            );
-        }
-
-        return $response->json() ?? [];
+        return $this->jsonOrFail($response, 'registerWebhook');
     }
 
     public function deleteWebhook(string $fullSlug, string $webhookUuid): bool
@@ -264,6 +258,17 @@ class BitbucketClient
             'DELETE' => $pending->delete($url),
             default => $pending->get($url),
         };
+    }
+
+    private function jsonOrFail(Response $response, string $method): array
+    {
+        if ($response->failed()) {
+            throw new \RuntimeException(
+                "Bitbucket {$method} failed ({$response->status()}): {$response->body()}"
+            );
+        }
+
+        return $response->json() ?? [];
     }
 
     private function captureRateLimitHeaders(Response $response): void
