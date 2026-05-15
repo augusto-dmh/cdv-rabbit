@@ -93,14 +93,23 @@ defineOptions({
                 <li class="flex items-start gap-2">
                     <span class="mt-0.5 text-primary">•</span>
                     <span>
-                        <strong>API token</strong> — an
+                        <strong>App Password</strong> — create one at
                         <a
-                            href="https://support.atlassian.com/bitbucket-cloud/docs/create-an-app-password/"
+                            href="https://bitbucket.org/account/settings/app-passwords/new"
                             target="_blank"
                             rel="noopener noreferrer"
                             class="text-primary underline"
-                        >App Password</a>
-                        with scopes: <code class="rounded bg-muted px-1">pullrequest:read/write</code>, <code class="rounded bg-muted px-1">repository:read/write</code>, <code class="rounded bg-muted px-1">webhook</code>, <code class="rounded bg-muted px-1">account:read</code>
+                        >Bitbucket → App passwords</a>
+                        with these permissions enabled:
+                        <ul class="mt-1.5 space-y-0.5 text-xs">
+                            <li><code class="rounded bg-muted px-1">Account: Read</code></li>
+                            <li><code class="rounded bg-muted px-1">Workspace membership: Read</code></li>
+                            <li><code class="rounded bg-muted px-1">Projects: Read, Admin</code></li>
+                            <li><code class="rounded bg-muted px-1">Repositories: Read, Write</code></li>
+                            <li><code class="rounded bg-muted px-1">Pull requests: Read, Write</code></li>
+                            <li><code class="rounded bg-muted px-1">Issues: Read, Write</code></li>
+                            <li><code class="rounded bg-muted px-1">Webhooks: Read and write</code></li>
+                        </ul>
                     </span>
                 </li>
                 <li class="flex items-start gap-2">
