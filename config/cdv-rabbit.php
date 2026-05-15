@@ -29,4 +29,11 @@ return [
      * The rabbit:lgpd-check command reads this file to verify operator sign-off.
      */
     'dpo_signoff_path' => env('DPO_SIGNOFF_PATH', storage_path('app/dpo-signoff.json')),
+
+    /*
+     * OpenAI Data Processing Agreement URL.
+     * Operators must set OPENAI_DPA_URL before enabling any workspace with llm_provider=openai.
+     * The rabbit:lgpd-check command fails until this is populated when any workspace uses OpenAI.
+     */
+    'openai_dpa_url' => env('OPENAI_DPA_URL'),
 ];

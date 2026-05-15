@@ -29,6 +29,7 @@ class Workspace extends Model
         'health',
         'daily_token_cap',
         'daily_token_cap_alert_threshold',
+        'llm_provider',
     ];
 
     protected function casts(): array

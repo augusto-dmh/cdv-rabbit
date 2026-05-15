@@ -23,6 +23,8 @@ class ReviewsLlmCall extends Model
         'review_id',
         'workspace_id',
         'model_id',
+        'provider',
+        'model',
         'role',
         'input_tokens',
         'cache_creation_input_tokens',
