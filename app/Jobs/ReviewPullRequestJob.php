@@ -232,6 +232,7 @@ class ReviewPullRequestJob implements ShouldQueue
                 // Telemetry per file call
                 app(LlmCallTelemetry::class)->record(
                     review: $review,
+                    provider: $provider,
                     modelId: config('cdv-rabbit.models.review', 'claude-sonnet-4-6'),
                     role: LlmCallRole::Review,
                     result: $result,

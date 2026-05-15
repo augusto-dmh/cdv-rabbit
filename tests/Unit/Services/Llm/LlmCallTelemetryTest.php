@@ -29,7 +29,7 @@ test('AC22: record persists all four token fields and request_id to reviews_llm_
         durationMs: 1234,
     );
 
-    $row = (new LlmCallTelemetry)->record($review, 'claude-sonnet-4-6', LlmCallRole::Review, $dto);
+    $row = (new LlmCallTelemetry)->record($review, 'anthropic', 'claude-sonnet-4-6', LlmCallRole::Review, $dto);
 
     expect($row)->toBeInstanceOf(ReviewsLlmCall::class)
         ->and($row->review_id)->toBe($review->id)
@@ -72,7 +72,7 @@ test('AC22: record with null request_id on error path stores error_type', functi
         durationMs: 50,
     );
 
-    $row = (new LlmCallTelemetry)->record($review, 'claude-sonnet-4-6', LlmCallRole::Review, $dto, 429, 'rate_limit_error');
+    $row = (new LlmCallTelemetry)->record($review, 'anthropic', 'claude-sonnet-4-6', LlmCallRole::Review, $dto, 429, 'rate_limit_error');
 
     expect($row->request_id)->toBeNull()
         ->and($row->http_status)->toBe(429)
@@ -95,7 +95,7 @@ test('record persists triage role correctly', function (): void {
         durationMs: 100,
     );
 
-    $row = (new LlmCallTelemetry)->record($review, 'claude-haiku-4-5-20251001', LlmCallRole::Triage, $dto);
+    $row = (new LlmCallTelemetry)->record($review, 'anthropic', 'claude-haiku-4-5-20251001', LlmCallRole::Triage, $dto);
 
     expect($row->role)->toBe(LlmCallRole::Triage)
         ->and($row->model_id)->toBe('claude-haiku-4-5-20251001')

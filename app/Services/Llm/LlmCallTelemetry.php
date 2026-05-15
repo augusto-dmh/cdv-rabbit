@@ -13,11 +13,12 @@ use Illuminate\Support\Carbon;
 final class LlmCallTelemetry
 {
     /**
-     * Persist a reviews_llm_calls row for one Anthropic API call.
+     * Persist a reviews_llm_calls row for one LLM API call.
      * Zero prompt/response text is ever written — LGPD compliance by design.
      */
     public function record(
         Review $review,
+        string $provider,
         string $modelId,
         LlmCallRole $role,
         ReviewResultDto $result,
@@ -27,7 +28,9 @@ final class LlmCallTelemetry
         return ReviewsLlmCall::create([
             'review_id' => $review->id,
             'workspace_id' => $review->workspace_id,
+            'provider' => $provider,
             'model_id' => $modelId,
+            'model' => $modelId,
             'role' => $role,
             'input_tokens' => $result->inputTokens,
             'cache_creation_input_tokens' => $result->cacheCreationInputTokens,
