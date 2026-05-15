@@ -8,11 +8,11 @@ use App\Models\Workspace;
 
 interface CostReservationInterface
 {
-    public function reserve(int $workspaceId, int $tokens, int $dailyCap): ReservationResult;
+    public function reserve(int $workspaceId, string $provider, int $tokens, int $dailyCap): ReservationResult;
 
-    public function consumed(int $workspaceId): int;
+    public function consumed(int $workspaceId, string $provider): int;
 
-    public function release(int $workspaceId, int $tokens): void;
+    public function release(int $workspaceId, string $provider, int $tokens): void;
 
     public function dailyCapFor(Workspace $workspace): int;
 

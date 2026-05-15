@@ -112,7 +112,7 @@ class ReviewPullRequestJob implements ShouldQueue
 
         // AC11 / M1: atomic cost reservation — Redis Lua script prevents TOCTOU
         $dailyCap = $costReservation->dailyCapFor($workspace);
-        $reservation = $costReservation->reserve($this->workspaceId, self::COST_RESERVATION_TOKENS, $dailyCap);
+        $reservation = $costReservation->reserve($this->workspaceId, $provider, self::COST_RESERVATION_TOKENS, $dailyCap);
 
         if ($reservation->denied()) {
             $review->update([
@@ -143,7 +143,7 @@ class ReviewPullRequestJob implements ShouldQueue
 
             if ($prData === null || ($prData['state'] ?? '') !== 'OPEN') {
                 $review->update(['status' => ReviewStatus::Skipped, 'finished_at' => now()]);
-                $costReservation->release($this->workspaceId, self::COST_RESERVATION_TOKENS);
+                $costReservation->release($this->workspaceId, $provider, self::COST_RESERVATION_TOKENS);
                 Log::info('ReviewPullRequestJob: PR not open, skipping', ['review_id' => $review->id]);
                 $this->emitReviewLog($review->fresh());
 
@@ -173,7 +173,7 @@ class ReviewPullRequestJob implements ShouldQueue
             if ($skipRules->isPrTooLarge($diffStat)) {
                 $this->postSkippedSummary($bitbucket, $repoFullSlug, $review, 'This PR is too large to review automatically (> 8 000 changed lines).');
                 $review->update(['status' => ReviewStatus::Skipped, 'finished_at' => now()]);
-                $costReservation->release($this->workspaceId, self::COST_RESERVATION_TOKENS);
+                $costReservation->release($this->workspaceId, $provider, self::COST_RESERVATION_TOKENS);
                 $this->emitReviewLog($review->fresh());
 
                 return;
@@ -184,7 +184,7 @@ class ReviewPullRequestJob implements ShouldQueue
 
             if ($diff === null || trim($diff) === '') {
                 $review->update(['status' => ReviewStatus::Skipped, 'finished_at' => now()]);
-                $costReservation->release($this->workspaceId, self::COST_RESERVATION_TOKENS);
+                $costReservation->release($this->workspaceId, $provider, self::COST_RESERVATION_TOKENS);
                 $this->emitReviewLog($review->fresh());
 
                 return;
@@ -206,7 +206,7 @@ class ReviewPullRequestJob implements ShouldQueue
 
             if (count($fileDiffs) === 0) {
                 $review->update(['status' => ReviewStatus::Skipped, 'finished_at' => now()]);
-                $costReservation->release($this->workspaceId, self::COST_RESERVATION_TOKENS);
+                $costReservation->release($this->workspaceId, $provider, self::COST_RESERVATION_TOKENS);
                 $this->emitReviewLog($review->fresh());
 
                 return;
@@ -258,11 +258,11 @@ class ReviewPullRequestJob implements ShouldQueue
                 'secrets_redacted' => $totalSecretsRedacted,
             ]);
 
-            $costReservation->notifyIfThresholdExceeded($workspace, $costReservation->consumed($this->workspaceId));
+            $costReservation->notifyIfThresholdExceeded($workspace, $costReservation->consumed($this->workspaceId, $provider));
             $this->emitReviewLog($review->fresh());
 
         } catch (LlmReviewException $e) {
-            $this->handleLlmException($e, $review, $bitbucket, $repoFullSlug, $costReservation);
+            $this->handleLlmException($e, $review, $bitbucket, $repoFullSlug, $costReservation, $provider);
         } catch (Throwable $e) {
             $review->update([
                 'status' => ReviewStatus::Failed,
@@ -271,7 +271,7 @@ class ReviewPullRequestJob implements ShouldQueue
                 'finished_at' => now(),
             ]);
 
-            $costReservation->release($this->workspaceId, self::COST_RESERVATION_TOKENS);
+            $costReservation->release($this->workspaceId, $provider, self::COST_RESERVATION_TOKENS);
 
             Log::error('ReviewPullRequestJob: unexpected error', [
                 'review_id' => $review->id,
@@ -321,6 +321,7 @@ class ReviewPullRequestJob implements ShouldQueue
         BitbucketClient $bitbucket,
         string $repoFullSlug,
         CostReservationInterface $costReservation,
+        string $provider,
     ): void {
         $decision = $e->retryDecision;
 
@@ -331,7 +332,7 @@ class ReviewPullRequestJob implements ShouldQueue
             'finished_at' => now(),
         ]);
 
-        $costReservation->release($this->workspaceId, self::COST_RESERVATION_TOKENS);
+        $costReservation->release($this->workspaceId, $provider, self::COST_RESERVATION_TOKENS);
 
         // Post an error summary comment so developers know the review failed
         try {

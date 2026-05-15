@@ -31,7 +31,7 @@ class FakeCostReservation implements CostReservationInterface
         $this->consumed = $granted ? 10_000 : $cap;
     }
 
-    public function reserve(int $workspaceId, int $tokens, int $dailyCap): ReservationResult
+    public function reserve(int $workspaceId, string $provider, int $tokens, int $dailyCap): ReservationResult
     {
         return new ReservationResult(
             granted: $this->granted,
@@ -40,12 +40,12 @@ class FakeCostReservation implements CostReservationInterface
         );
     }
 
-    public function consumed(int $workspaceId): int
+    public function consumed(int $workspaceId, string $provider): int
     {
         return $this->consumed;
     }
 
-    public function release(int $workspaceId, int $tokens): void
+    public function release(int $workspaceId, string $provider, int $tokens): void
     {
         $this->releaseCalled = true;
     }

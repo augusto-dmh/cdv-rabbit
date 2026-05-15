@@ -26,9 +26,9 @@ final class CostReservation implements CostReservationInterface
      * Atomically reserve tokens against the workspace's daily cap.
      * Uses a Lua script so check + increment is a single Redis transaction — no TOCTOU.
      */
-    public function reserve(int $workspaceId, int $tokens, int $dailyCap): ReservationResult
+    public function reserve(int $workspaceId, string $provider, int $tokens, int $dailyCap): ReservationResult
     {
-        $key = $this->bucketKey($workspaceId);
+        $key = $this->bucketKey($workspaceId, $provider);
 
         /** @var array{int, int} $result */
         $result = Redis::eval(
@@ -49,17 +49,17 @@ final class CostReservation implements CostReservationInterface
     /**
      * Read the current consumed token count (non-atomic, best-effort).
      */
-    public function consumed(int $workspaceId): int
+    public function consumed(int $workspaceId, string $provider): int
     {
-        return (int) Redis::get($this->bucketKey($workspaceId));
+        return (int) Redis::get($this->bucketKey($workspaceId, $provider));
     }
 
     /**
      * Refund tokens after a failed job (bounded at 0 — never go negative).
      */
-    public function release(int $workspaceId, int $tokens): void
+    public function release(int $workspaceId, string $provider, int $tokens): void
     {
-        $key = $this->bucketKey($workspaceId);
+        $key = $this->bucketKey($workspaceId, $provider);
         $current = (int) Redis::get($key);
 
         if ($current <= 0) {
@@ -98,10 +98,10 @@ final class CostReservation implements CostReservationInterface
         }
     }
 
-    private function bucketKey(int $workspaceId): string
+    private function bucketKey(int $workspaceId, string $provider): string
     {
         $date = now()->utc()->format('Ymd');
 
-        return "workspace:{$workspaceId}:tokens:{$date}";
+        return "workspace:{$workspaceId}:tokens:{$date}:{$provider}";
     }
 }

@@ -34,7 +34,7 @@ test('AC20: single reserve happy path — Lua returns granted + consumed', funct
         ->once()
         ->andReturn([1, 1000]);
 
-    $result = makeCostReservation()->reserve(42, 1000, 10_000);
+    $result = makeCostReservation()->reserve(42, 'anthropic', 1000, 10_000);
 
     expect($result)->toBeInstanceOf(ReservationResult::class)
         ->and($result->granted)->toBeTrue()
@@ -49,7 +49,7 @@ test('AC20: reserve exceeding cap — Lua returns denied + current unchanged', f
         ->once()
         ->andReturn([0, 4000]);
 
-    $result = makeCostReservation()->reserve(42, 2000, 5_000);
+    $result = makeCostReservation()->reserve(42, 'anthropic', 2000, 5_000);
 
     expect($result->granted)->toBeFalse()
         ->and($result->consumed)->toBe(4000)
@@ -64,8 +64,8 @@ test('AC20: two sequential reserves — first succeeds, second denied (Lua atomi
         ->andReturn([1, 2000], [0, 2000]); // first granted, second denied
 
     $service = makeCostReservation();
-    $first = $service->reserve(42, 2000, 3_000);
-    $second = $service->reserve(42, 2000, 3_000);
+    $first = $service->reserve(42, 'anthropic', 2000, 3_000);
+    $second = $service->reserve(42, 'anthropic', 2000, 3_000);
 
     expect($first->granted)->toBeTrue()
         ->and($second->granted)->toBeFalse()
@@ -75,7 +75,7 @@ test('AC20: two sequential reserves — first succeeds, second denied (Lua atomi
 test('consumed returns current Redis value', function (): void {
     Redis::shouldReceive('get')->once()->andReturn('3000');
 
-    $consumed = makeCostReservation()->consumed(42);
+    $consumed = makeCostReservation()->consumed(42, 'anthropic');
 
     expect($consumed)->toBe(3000);
 });
@@ -83,7 +83,7 @@ test('consumed returns current Redis value', function (): void {
 test('consumed returns zero when key does not exist', function (): void {
     Redis::shouldReceive('get')->once()->andReturn(null);
 
-    $consumed = makeCostReservation()->consumed(99999);
+    $consumed = makeCostReservation()->consumed(99999, 'anthropic');
 
     expect($consumed)->toBe(0);
 });
@@ -92,7 +92,7 @@ test('release decrements by the amount requested', function (): void {
     Redis::shouldReceive('get')->once()->andReturn('3000');
     Redis::shouldReceive('decrby')->once()->with(Mockery::any(), 1000);
 
-    makeCostReservation()->release(42, 1000);
+    makeCostReservation()->release(42, 'anthropic', 1000);
 });
 
 test('release is bounded at zero — decrement capped to current value', function (): void {
@@ -100,14 +100,14 @@ test('release is bounded at zero — decrement capped to current value', functio
     // Should decrement by 500, not 9999.
     Redis::shouldReceive('decrby')->once()->with(Mockery::any(), 500);
 
-    makeCostReservation()->release(42, 9999);
+    makeCostReservation()->release(42, 'anthropic', 9999);
 });
 
 test('release is a no-op when counter is already zero', function (): void {
     Redis::shouldReceive('get')->once()->andReturn('0');
     Redis::shouldReceive('decrby')->never();
 
-    makeCostReservation()->release(42, 1000);
+    makeCostReservation()->release(42, 'anthropic', 1000);
 });
 
 test('dailyCapFor returns workspace column value', function (): void {
