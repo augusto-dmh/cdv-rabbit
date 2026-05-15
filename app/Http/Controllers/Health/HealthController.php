@@ -22,6 +22,7 @@ class HealthController extends Controller
             'horizon' => fn () => $this->checkHorizon(),
             'bitbucket_api' => fn () => $this->checkBitbucket(),
             'anthropic_api' => fn () => $this->checkAnthropic(),
+            'openai_api' => fn () => $this->checkOpenAi(),
         ];
 
         // Concurrency::run spawns child processes — mocks don't survive the fork.
@@ -115,6 +116,20 @@ class HealthController extends Controller
 
         try {
             $response = Http::timeout(2)->get(config('ai.providers.anthropic.url'));
+            $ok = $response->status() < 500;
+        } catch (\Throwable) {
+            $ok = false;
+        }
+
+        return ['ok' => $ok, 'duration_ms' => $this->ms($start)];
+    }
+
+    private function checkOpenAi(): array
+    {
+        $start = hrtime(true);
+
+        try {
+            $response = Http::timeout(2)->get('https://api.openai.com/v1/');
             $ok = $response->status() < 500;
         } catch (\Throwable) {
             $ok = false;

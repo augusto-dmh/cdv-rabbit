@@ -181,6 +181,12 @@ W2 workers will be shut down before W3 team spins up.
 
 ---
 
+## 3.6 Multi-provider notes
+
+cdv-rabbit supports Anthropic Claude (default) and OpenAI GPT side-by-side. Provider is selected per workspace via `workspaces.llm_provider` (enum: `anthropic`|`openai`, default `anthropic`). Both providers implement the same `LlmDriverInterface`; the `LlmDriverFactory` resolves the correct driver at job execution time inside `ReviewPullRequestJob::handle()` after loading the workspace. OpenAI uses `response_format: json_schema` strict for structured output; Anthropic uses `tool_choice` strict. Cost reservation Lua keys are scoped per provider (`workspace:{id}:tokens:{date}:{provider}`), giving each provider an independent daily ceiling. `LlmCallTelemetry` records `provider` + `model` for every call. `rabbit:lgpd-check` check #9 gates on `OPENAI_DPA_URL` env being set whenever any workspace uses OpenAI. See `specs/ai-code-review-pipeline.md` §15 and `.omc/plans/openai-provider-support.md`.
+
+---
+
 ## 4. Locked technical contracts (DO NOT CHANGE without bumping a version)
 
 These are the contracts that future commits must honor. Full

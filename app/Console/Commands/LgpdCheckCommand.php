@@ -11,6 +11,7 @@ use App\Queue\RedactingFailedJobProvider;
 use App\Services\Review\SecretRedactor;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -39,6 +40,7 @@ class LgpdCheckCommand extends Command
             'SecretRedactor sanitises AWS key pattern' => $this->checkSecretRedactor(),
             'Retention command scheduled daily' => $this->checkRetentionScheduled(),
             'Anthropic DPA URL configured' => $this->checkAnthropicDpaUrl(),
+            'OpenAI DPA URL configured (when workspaces use OpenAI)' => $this->checkOpenAiDpaUrl(),
             'DPO sign-off on record (< 1 year)' => $this->checkDpoSignoff(),
         ];
 
@@ -179,6 +181,24 @@ class LgpdCheckCommand extends Command
         }
 
         return [true, 'anthropic_dpa_url is set'];
+    }
+
+    /** @return array{bool, string} */
+    private function checkOpenAiDpaUrl(): array
+    {
+        $hasOpenAiWorkspace = DB::table('workspaces')->where('llm_provider', 'openai')->exists();
+
+        if (! $hasOpenAiWorkspace) {
+            return [true, 'No workspaces use OpenAI — check not required'];
+        }
+
+        $url = config('cdv-rabbit.openai_dpa_url');
+
+        if (empty($url)) {
+            return [false, 'Env var OPENAI_DPA_URL not set (required when any workspace uses OpenAI)'];
+        }
+
+        return [true, 'openai_dpa_url is set'];
     }
 
     /** @return array{bool, string} */
