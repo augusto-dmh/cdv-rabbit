@@ -6,7 +6,7 @@
 **LGPD Compliance Tooling — `rabbit:purge-stale` + `rabbit:lgpd-check`**
 
 ### 1.2. One-sentence summary
-Two artisan commands harden the LGPD posture established in Phase 1: `rabbit:purge-stale` enforces a retention policy (soft-delete reviews >365 days, hard-delete after a 30-day grace, hard-delete webhook receipts >90 days) on a daily schedule; `rabbit:lgpd-check` is a CI-runnable deploy gate that fails the deploy until 8 structural + operator-managed posture checks all pass (including DPO sign-off and Anthropic DPA URL).
+Two artisan commands harden the LGPD posture established in Phase 1: `rabbit:purge-stale` enforces a retention policy (soft-delete reviews >365 days, hard-delete after a 30-day grace, hard-delete webhook receipts >90 days) on a daily schedule; `rabbit:lgpd-check` is a CI-runnable deploy gate that fails the deploy until 9 structural + operator-managed posture checks all pass (including DPO sign-off, Anthropic DPA URL, **and OpenAI DPA URL when any workspace uses OpenAI**).
 
 ### 1.3. Primary outcome
 A fresh deploy that lacks `ANTHROPIC_DPA_URL` env var OR `storage/app/dpo-signoff.json` returns exit 1 from `php artisan rabbit:lgpd-check` and the CI step blocks the deploy. Once both are set, the command exits 0 and the deploy proceeds. Separately, a Review row older than 395 days no longer exists in any table after the nightly purge runs.
@@ -27,7 +27,7 @@ Without retention enforcement, "no diff at rest" silently degrades over time as 
 ### 2.3. Goals
 - **G1**: Daily scheduled purge removes stale reviews + cascading children + old webhook deliveries.
 - **G2**: Configurable retention thresholds via env vars (no code change to extend retention).
-- **G3**: `rabbit:lgpd-check` runs 8 structural + operator-managed checks; binary exit 0/1.
+- **G3**: `rabbit:lgpd-check` runs 9 structural + operator-managed checks; binary exit 0/1.
 - **G4**: Each check has a positive + negative test for regression coverage.
 - **G5**: CI-friendly output — colorized table for humans, exit code for automation.
 
@@ -109,7 +109,7 @@ CI step → `php artisan rabbit:lgpd-check` → 8 checks run → table printed �
 
 ### 5.2. `rabbit:lgpd-check`
 
-**FR-05 — Eight checks**
+**FR-05 — Nine checks**
 1. **Schema audit** — no forbidden column name on (reviews, review_comments, reviews_llm_calls, webhook_deliveries).
 2. **Encryption casts** — Workspace::$casts has bitbucket_token + webhook_secret as `encrypted:string`.
 3. **Failed-jobs provider** — `queue.failer` resolves to `RedactingFailedJobProvider`.
@@ -118,6 +118,7 @@ CI step → `php artisan rabbit:lgpd-check` → 8 checks run → table printed �
 6. **Retention scheduled** — Schedule registry contains `rabbit:purge-stale` daily.
 7. **Anthropic DPA env** — `config('cdv-rabbit.anthropic_dpa_url')` non-empty.
 8. **DPO sign-off** — `storage/app/dpo-signoff.json` exists + valid JSON + `signed_at` within 12 months.
+9. **OpenAI DPA env (conditional)** — if any `workspaces.llm_provider = 'openai'` exists, `config('cdv-rabbit.openai_dpa_url')` must be non-empty.
 
 **FR-06 — Output**
 - Colorized table (green ✓ / red ✗) with check name + ok + reason.
@@ -153,6 +154,7 @@ CI step → `php artisan rabbit:lgpd-check` → 8 checks run → table printed �
     'webhook_delivery_days' => env('RABBIT_RETENTION_WEBHOOK_DELIVERY_DAYS', 90),
 ],
 'anthropic_dpa_url' => env('ANTHROPIC_DPA_URL'),
+'openai_dpa_url' => env('OPENAI_DPA_URL'),
 'dpo_signoff_path' => storage_path('app/dpo-signoff.json'),
 ```
 
@@ -236,3 +238,4 @@ Open: should the purge run also emit a "purge_run_complete" event for downstream
 ## 15. Change Log
 
 - **v1.0 (2026-05-14 / phase-5-complete)** — Initial implementation. Commits: `786d9d8` (W5-T3 purge command + schedule + migration), `7022192` (W5-T4 lgpd-check command), Phase 5 verifier commit (T5 smoke case 4 covering both commands). Tests: PurgeStaleReviewsCommandTest (6 cases) + LgpdCheckCommandTest (17 cases) + Phase5HardeningSmokeTest cases 3-4.
+- **v1.1 (2026-05-15 / phase-openai)** — Added check #9: OpenAI DPA URL gate. `OPENAI_DPA_URL` must be set when any workspace uses OpenAI. Config key `openai_dpa_url` added. Tests: LgpdCheckCommandTest updated (check 9 pass/fail/no-workspace cases).

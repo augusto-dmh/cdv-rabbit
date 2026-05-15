@@ -58,7 +58,7 @@ Calling an LLM to review code involves: prompt construction, untrusted-content w
 - `reviews_llm_calls` table (Phase 1 migration, populated here).
 
 ### 3.2. Out-of-scope for this iteration
-- Multi-provider fallback (laravel/ai supports it but we only use Anthropic in MVP).
+- ~~Multi-provider fallback~~ — implemented in phase-openai (see `multi-llm-provider-support.md`).
 - Streaming partial responses to the UI (we consume the final message).
 - Per-file parallel LLM calls (sequential in MVP; concurrency optimization deferred).
 
@@ -196,7 +196,8 @@ PR opens → webhook arrives → `ReviewPullRequestJob` dispatched → kill-swit
 
 ### 7.3. Contracts
 - `LlmDriverInterface::reviewDiff(string, array, string, array): ReviewResultDto`.
-- `CostReservationInterface::reserve(int, int, int): ReservationResult`.
+- `LlmDriverFactory::make(Workspace): LlmDriverInterface`.
+- `CostReservationInterface::reserve(int, string, int, int): ReservationResult`.
 - `RetryDecision` enum: `Terminal | RetryWithBackoff | PauseWorkspace`.
 
 ---

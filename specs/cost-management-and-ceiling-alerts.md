@@ -6,7 +6,7 @@
 **Cost Management — Atomic Daily Token Reservation + Threshold Alerts**
 
 ### 1.2. One-sentence summary
-Every workspace has a daily Anthropic-token budget enforced via a Redis Lua atomic check-and-INCRBY (race-free even under concurrent jobs), with a configurable threshold percentage that triggers an email to workspace admins before the budget is exhausted.
+Every workspace has a daily token budget per provider enforced via a Redis Lua atomic check-and-INCRBY (race-free even under concurrent jobs), with per-provider isolation (each provider has an independent daily ceiling) and a configurable threshold percentage that triggers an email to workspace admins before the budget is exhausted.
 
 ### 1.3. Primary outcome
 Two concurrent `ReviewPullRequestJob` invocations for the same workspace cannot both succeed in reserving more than the daily cap allows together; one succeeds, one is denied with `error_class=cost_ceiling`. A workspace whose consumption crosses 70% of its cap receives a single alert email per day.
@@ -131,12 +131,13 @@ Operator sets `daily_token_cap=200000` (default) and `threshold=70` (default) at
 - `workspaces.daily_token_cap_alert_threshold` (tinyint, default 70).
 
 ### 7.2. Redis keys
-- `workspace:{id}:tokens:{YYYYMMDD}` — counter, TTL 26h.
+- `workspace:{id}:tokens:{YYYYMMDD}:{provider}` — counter, TTL 26h. Each provider (anthropic, openai) has an independent daily counter and ceiling.
 - `workspace:{id}:alert_sent:{YYYYMMDD}` — once-per-day alert marker.
 
 ### 7.3. Contracts
-- `CostReservationInterface::reserve(int, int, int): ReservationResult`.
-- `CostReservationInterface::release(int, int): void`.
+- `CostReservationInterface::reserve(int $workspaceId, string $provider, int $tokens, int $dailyCap): ReservationResult`.
+- `CostReservationInterface::consumed(int $workspaceId, string $provider): int`.
+- `CostReservationInterface::release(int $workspaceId, string $provider, int $tokens): void`.
 - `ReservationResult` with `granted()`, `denied()`, `remaining()`.
 
 ---
@@ -219,3 +220,4 @@ Open: should we add an HOURLY rate limit on TOP of the daily cap to defend again
 ## 15. Change Log
 
 - **v1.0 (2026-05-14 / phase-3-complete)** — Initial Phase 3 implementation. Commit: `eb74aca` (W3-T5 CostReservation + Lua + mailable + migration). Wired into orchestrator in `d64b0cb` (W3-T7). 13/13 unit tests at landing; AC11 + AC20 green.
+- **v1.1 (2026-05-15 / phase-openai)** — Per-provider cost isolation. Lua key now includes provider suffix (`workspace:{id}:tokens:{date}:{provider}`) so each provider has independent daily ceiling. `CostReservationInterface` methods gain `string $provider` parameter. Tests: CostReservationTest covers per-provider budgets.

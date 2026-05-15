@@ -6,7 +6,7 @@
 **Health & Readiness — Multi-Dep `/up` Endpoint**
 
 ### 1.2. One-sentence summary
-`GET /up` runs five concurrent dependency checks (DB, Redis, Horizon supervisor freshness, Bitbucket API, Anthropic API), capping at 5 seconds total, and returns `200 + status=healthy` only when all are green or `503 + per-check breakdown` when any are degraded — giving ops a single endpoint for liveness + readiness signals.
+`GET /up` runs **six** concurrent dependency checks (DB, Redis, Horizon supervisor freshness, Bitbucket API, Anthropic API, **OpenAI API**), capping at 5 seconds total, and returns `200 + status=healthy` only when all are green or `503 + per-check breakdown` when any are degraded — giving ops a single endpoint for liveness + readiness signals.
 
 ### 1.3. Primary outcome
 `curl localhost/up` during a healthy state returns 200 with all five `ok=true` checks and a millisecond duration each. Take BB API down (or simulate via 5xx) and the same call returns 503 with `bitbucket_api.ok=false` and the other four still ok — within 6 seconds total even with one timeout.
@@ -25,7 +25,7 @@ Laravel ships a default `/up` route that returns 200 if PHP boots. That's a live
 Without per-dep visibility, the only ops-side signal for "reviews aren't running" is "PRs aren't getting comments." That diagnostic loop is hours. `/up` with per-dep breakdown collapses it to seconds.
 
 ### 2.3. Goals
-- **G1**: Single endpoint covering DB + Redis + Horizon + BB + Anthropic.
+- **G1**: Single endpoint covering DB + Redis + Horizon + BB + Anthropic + OpenAI.
 - **G2**: Per-check duration_ms so the slow dep is identifiable from the response alone.
 - **G3**: Each external check capped at 2s; aggregate at 5s. Hard time bound.
 - **G4**: 200/503 binary status for orchestrators (Kubernetes, Laravel Cloud) + JSON detail for humans.
@@ -80,12 +80,13 @@ External caller → `GET /up` → controller starts 5 concurrent closures → ea
 
 ## 5. Functional Requirements
 
-**FR-01 — Five concurrent checks**
+**FR-01 — Six concurrent checks**
 - DB: `DB::connection()->getPdo()` — cheap, sync.
 - Redis: `Redis::ping()` — cheap, sync.
 - Horizon: read `horizon:masters` sorted set; for each supervisor, compute age via `zscore`. Any supervisor with age > 60s = stale = degraded. If no supervisors at all = degraded (Horizon not running).
 - Bitbucket: HEAD to `config('services.bitbucket.base_url')` with `Http::timeout(2)`. 200 or 401 = reachable; 5xx or timeout = degraded.
 - Anthropic: HEAD/GET to the configured Anthropic base, same 2s timeout, same 200/401 = reachable convention.
+- OpenAI: HEAD/GET to the configured OpenAI base URL, same 2s timeout, same 200/401 = reachable convention.
 
 **FR-02 — Aggregate**
 - All `ok=true` → 200 + status="healthy".
@@ -100,7 +101,8 @@ External caller → `GET /up` → controller starts 5 concurrent closures → ea
     "redis": {"ok": true, "duration_ms": 1},
     "horizon": {"ok": true, "duration_ms": 3, "supervisor_age_seconds": 12},
     "bitbucket_api": {"ok": true, "duration_ms": 87},
-    "anthropic_api": {"ok": true, "duration_ms": 124}
+    "anthropic_api": {"ok": true, "duration_ms": 124},
+    "openai_api": {"ok": true, "duration_ms": 87}
   },
   "version": "3409cc6"
 }
@@ -173,7 +175,7 @@ Phase 5 acceptance:
 - **AC15** (full coverage; was partial after W2) — `/up` returns 200 only when DB + Redis + BB API + Horizon + Anthropic are reachable.
 
 Tests:
-- `tests/Feature/Health/HealthControllerTest.php` — 9 cases:
+- `tests/Feature/Health/HealthControllerTest.php` — 11 cases:
   - all-healthy → 200, status=healthy.
   - DB down → 503.
   - Redis down → 503.
@@ -181,6 +183,8 @@ Tests:
   - Anthropic timeout → 503.
   - Horizon stale → 503.
   - BB 401 → still reachable (200).
+  - OpenAI base URL returns 401: healthy.
+  - OpenAI times out: 503.
   - version key present.
   - aggregate completes within 6s even with one timed-out check.
 - `tests/Feature/Phase5/Phase5HardeningSmokeTest.php` — case 2: full-stack healthy → 200.
@@ -216,3 +220,4 @@ Open: should we add a `/ready` endpoint distinct from `/up` (liveness vs readine
 ## 15. Change Log
 
 - **v1.0 (2026-05-14 / phase-5-complete)** — Initial implementation. Commits: `3409cc6` (W5-T2 controller + 9 tests), `(W5-T5 commit)` smoke case 2. Tests: HealthControllerTest (9 cases) + Phase5HardeningSmokeTest case 2.
+- **v1.1 (2026-05-15 / phase-openai)** — Added openai_api health check. 401 convention applies (reachable = ok). Tests updated in HealthControllerTest.php (11 cases total).
