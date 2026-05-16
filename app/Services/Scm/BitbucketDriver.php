@@ -288,6 +288,52 @@ class BitbucketDriver implements ScmDriverInterface
         ]);
     }
 
+    /**
+     * AC51: post a Bitbucket Cloud "build status" on the PR head SHA so consumer
+     * repos can gate auto-merge on cdv-rabbit's verdict. Maps internal states
+     * ('pending'|'success'|'failure') onto Bitbucket's build-status states
+     * (INPROGRESS|SUCCESSFUL|FAILED).
+     */
+    public function postCommitStatus(
+        string $scmRepoId,
+        string $headSha,
+        string $state,
+        string $context,
+        string $description,
+        ?string $targetUrl = null,
+    ): void {
+        $fullName = $this->resolveFullName($scmRepoId);
+
+        $bbState = match ($state) {
+            'success' => 'SUCCESSFUL',
+            'failure' => 'FAILED',
+            default => 'INPROGRESS',
+        };
+
+        $payload = [
+            'key' => $context,
+            'state' => $bbState,
+            'name' => $context,
+            'description' => substr($description, 0, 140),
+            'url' => $targetUrl ?? config('app.url', 'https://cdv-rabbit'),
+        ];
+
+        $response = $this->request(
+            'POST',
+            "/repositories/{$fullName}/commit/{$headSha}/statuses/build",
+            $payload,
+        );
+        $this->captureRateLimitHeaders($response);
+
+        Log::channel('bitbucket')->info('postCommitStatus', [
+            'full_name' => $fullName,
+            'head_sha' => substr($headSha, 0, 8),
+            'state' => $bbState,
+            'context' => $context,
+            'status' => $response->status(),
+        ]);
+    }
+
     /** @return array<string, int|null>|null */
     public function lastRateLimit(): ?array
     {

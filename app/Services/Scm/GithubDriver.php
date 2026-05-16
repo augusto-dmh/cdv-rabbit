@@ -274,6 +274,48 @@ class GithubDriver implements ScmDriverInterface
      */
     public function deleteWebhook(string $scmRepoId, ?WebhookHandle $handle): void {}
 
+    /**
+     * AC51: post a GitHub commit status on the PR head SHA so consumer repos can
+     * gate auto-merge via required-status-checks on branch protection. States
+     * map 1:1 onto GitHub's API ('pending'|'success'|'failure').
+     */
+    public function postCommitStatus(
+        string $scmRepoId,
+        string $headSha,
+        string $state,
+        string $context,
+        string $description,
+        ?string $targetUrl = null,
+    ): void {
+        $owner = $this->resolveOwner($scmRepoId);
+        $repoName = $this->resolveRepoName($scmRepoId);
+
+        $payload = [
+            'state' => $state,
+            'context' => $context,
+            'description' => substr($description, 0, 140),
+        ];
+
+        if ($targetUrl !== null) {
+            $payload['target_url'] = $targetUrl;
+        }
+
+        $response = $this->request(
+            'POST',
+            "/repos/{$owner}/{$repoName}/statuses/{$headSha}",
+            $payload,
+        );
+        $this->captureRateLimitHeaders($response);
+
+        Log::channel('bitbucket')->info('github.postCommitStatus', [
+            'scm_repo_id' => $scmRepoId,
+            'head_sha' => substr($headSha, 0, 8),
+            'state' => $state,
+            'context' => $context,
+            'status' => $response->status(),
+        ]);
+    }
+
     /** @return array<string, int|string|null>|null */
     public function lastRateLimit(): ?array
     {

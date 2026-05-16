@@ -67,7 +67,7 @@ test('app/Services/Bitbucket/ directory was removed (W6-T3 cleanup)', function (
     expect(is_dir(app_path('Services/Bitbucket')))->toBeFalse();
 });
 
-test('ScmDriverInterface declares exactly the 11 contract methods', function (): void {
+test('ScmDriverInterface declares exactly the 12 contract methods', function (): void {
     $reflection = new ReflectionClass(ScmDriverInterface::class);
     $methods = array_map(fn ($m) => $m->getName(), $reflection->getMethods());
 
@@ -79,6 +79,7 @@ test('ScmDriverInterface declares exactly the 11 contract methods', function ():
         'getPullRequest',
         'getRepository',
         'listRepositories',
+        'postCommitStatus',
         'postInlineComment',
         'postPullRequestComment',
         'registerWebhook',

@@ -147,6 +147,9 @@ class ReviewPullRequestJob implements ShouldQueue
 
         $review->update(['status' => ReviewStatus::Running, 'started_at' => now()]);
 
+        // AC51: post pending status on PR head SHA so consumer repos can gate auto-merge.
+        $this->postCommitStatus($driver, $review, $scmRepoId, 'pending', 'cdv-rabbit review in progress.');
+
         try {
             // Pre-flight: verify PR is still OPEN and refresh head_sha
             $prData = $driver->getPullRequest($scmRepoId, $this->pullRequestNumber);
@@ -296,6 +299,13 @@ class ReviewPullRequestJob implements ShouldQueue
                 'secrets_redacted' => $totalSecretsRedacted,
             ]);
 
+            // AC51: gate consumers on final verdict — high-severity findings → failure.
+            $finalState = $this->stateFromComments($allComments);
+            $finalDescription = $finalState === 'failure'
+                ? 'High-severity issues found; please address before merging.'
+                : 'cdv-rabbit review complete.';
+            $this->postCommitStatus($driver, $review, $scmRepoId, $finalState, $finalDescription);
+
             $costReservation->notifyIfThresholdExceeded($workspace, $costReservation->consumed($this->workspaceId, $provider));
             $this->emitReviewLog($review->fresh());
 
@@ -310,6 +320,9 @@ class ReviewPullRequestJob implements ShouldQueue
             ]);
 
             $costReservation->release($this->workspaceId, $provider, $reservationTokens);
+
+            // AC51: catch-and-post failure status before rethrowing so consumers always see a verdict.
+            $this->postCommitStatus($driver, $review, $scmRepoId, 'failure', 'cdv-rabbit review failed.');
 
             Log::error('ReviewPullRequestJob: unexpected error', [
                 'review_id' => $review->id,
@@ -372,6 +385,9 @@ class ReviewPullRequestJob implements ShouldQueue
         ]);
 
         $costReservation->release($this->workspaceId, $provider, $reservationTokens);
+
+        // AC51: surface LLM failure to consumer auto-merge gating.
+        $this->postCommitStatus($driver, $review, $scmRepoId, 'failure', 'cdv-rabbit review failed.');
 
         // Post an error summary comment so developers know the review failed
         try {
@@ -618,6 +634,20 @@ class ReviewPullRequestJob implements ShouldQueue
             'error_class' => $critiqueFailed ? 'critique_failed' : null,
         ]);
 
+        // AC51: v2 verdict on PR head SHA — high-severity findings → failure.
+        $hasHighSeverity = false;
+        foreach ($finalDraft->findings as $finding) {
+            if ($finding->severity === 'high') {
+                $hasHighSeverity = true;
+                break;
+            }
+        }
+        $finalState = $hasHighSeverity ? 'failure' : 'success';
+        $finalDescription = $hasHighSeverity
+            ? 'High-severity issues found; please address before merging.'
+            : 'cdv-rabbit review complete.';
+        $this->postCommitStatus($driver, $review, $scmRepoId, $finalState, $finalDescription);
+
         Log::channel('cdv-rabbit-reviews')->info('review.v2_pipeline', [
             'correlation_id' => $review->correlation_id,
             'schema_version' => ReviewSchemaVersion::V2->value,
@@ -626,6 +656,56 @@ class ReviewPullRequestJob implements ShouldQueue
             'nitpick_count' => count($finalDraft->nitpicks),
             'critique_failed' => $critiqueFailed,
         ]);
+    }
+
+    /**
+     * AC51: post a commit status on the PR head SHA via the active SCM driver and
+     * persist the state on the review row. Swallows driver errors so a misconfigured
+     * status endpoint never silences the review pipeline itself.
+     */
+    private function postCommitStatus(
+        ScmDriverInterface $driver,
+        Review $review,
+        string $scmRepoId,
+        string $state,
+        string $description,
+    ): void {
+        $context = (string) config('cdv-rabbit.status_check_context', 'cdv-rabbit/review');
+
+        try {
+            $driver->postCommitStatus(
+                scmRepoId: $scmRepoId,
+                headSha: (string) $review->head_sha,
+                state: $state,
+                context: $context,
+                description: $description,
+            );
+        } catch (Throwable $statusError) {
+            Log::warning('ReviewPullRequestJob: postCommitStatus failed; continuing', [
+                'review_id' => $review->id,
+                'state' => $state,
+                'error' => $statusError->getMessage(),
+            ]);
+        }
+
+        $review->update(['status_check_state' => $state]);
+    }
+
+    /**
+     * AC51 (v1 path): derive the final commit-status state from the aggregated
+     * v1 comments — any 'high' severity comment promotes the verdict to failure.
+     *
+     * @param  array<int, ReviewCommentDto>  $comments
+     */
+    private function stateFromComments(array $comments): string
+    {
+        foreach ($comments as $comment) {
+            if ($comment->severity === 'high') {
+                return 'failure';
+            }
+        }
+
+        return 'success';
     }
 
     private function buildCriticUserMessage(string $diff, DraftReviewDto $draft): string

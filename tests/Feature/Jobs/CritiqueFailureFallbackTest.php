@@ -150,6 +150,8 @@ function fallbackMakeFakeScmDriver(): object
         }
 
         public function deleteWebhook(string $scmRepoId, ?WebhookHandle $handle): void {}
+
+        public function postCommitStatus(string $scmRepoId, string $headSha, string $state, string $context, string $description, ?string $targetUrl = null): void {}
     };
 }
 

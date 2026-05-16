@@ -199,6 +199,19 @@ function makeFakeScmDriver(): object
         }
 
         public function deleteWebhook(string $scmRepoId, ?WebhookHandle $handle): void {}
+
+        /** @var list<array{state: string, sha: string, context: string, description: string}> */
+        public array $commitStatuses = [];
+
+        public function postCommitStatus(string $scmRepoId, string $headSha, string $state, string $context, string $description, ?string $targetUrl = null): void
+        {
+            $this->commitStatuses[] = [
+                'state' => $state,
+                'sha' => $headSha,
+                'context' => $context,
+                'description' => $description,
+            ];
+        }
     };
 }
 

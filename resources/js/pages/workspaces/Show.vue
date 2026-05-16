@@ -27,6 +27,7 @@ type Workspace = {
     health: string;
     kill_switch_enabled: boolean;
     llm_provider: string;
+    review_schema_version: 'v1' | 'v2';
     scm_provider: 'bitbucket_cloud' | 'github_cloud';
     scm_owner_slug: string | null;
     github_installation_id: string | null;
@@ -68,6 +69,14 @@ function updateProvider(provider: string): void {
     router.patch(
         update.url(props.workspace.slug),
         { llm_provider: provider },
+        { preserveScroll: true },
+    );
+}
+
+function updateSchemaVersion(version: string): void {
+    router.patch(
+        update.url(props.workspace.slug),
+        { review_schema_version: version },
         { preserveScroll: true },
     );
 }
@@ -128,6 +137,26 @@ const repoBaseUrl = computed(() => (isGithub.value ? 'https://github.com/' : 'ht
                     <SelectContent>
                         <SelectItem value="anthropic">Anthropic Claude</SelectItem>
                         <SelectItem value="openai">OpenAI GPT</SelectItem>
+                    </SelectContent>
+                </Select>
+            </CardContent>
+        </Card>
+
+        <Card v-if="isAdmin">
+            <CardHeader>
+                <CardTitle class="text-sm font-medium">Review Schema Version</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-2">
+                <p class="text-sm text-muted-foreground">
+                    v2 enables CodeRabbit-style high-recall reviews with the draft → critique pipeline. ~2× LLM cost per review. Per-Workspace rollout.
+                </p>
+                <Select :default-value="workspace.review_schema_version" @update:model-value="updateSchemaVersion">
+                    <SelectTrigger class="w-56">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="v1">v1 (classic)</SelectItem>
+                        <SelectItem value="v2">v2 (high-recall, beta)</SelectItem>
                     </SelectContent>
                 </Select>
             </CardContent>

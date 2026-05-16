@@ -51,4 +51,11 @@ return [
      * production telemetry confirms the cache-hit-adjusted ratio.
      */
     'cost_per_review_factor' => (int) env('CDV_RABBIT_COST_PER_REVIEW_FACTOR', 2),
+
+    /*
+     * AC51: commit-status context name posted by ReviewPullRequestJob on the PR head SHA.
+     * Consumer repos add this string to their branch protection's required-status-checks
+     * to gate auto-merge on cdv-rabbit reviews.
+     */
+    'status_check_context' => (string) env('CDV_RABBIT_STATUS_CHECK_CONTEXT', 'cdv-rabbit/review'),
 ];

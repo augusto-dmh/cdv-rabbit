@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Workspaces;
 
 use App\Concerns\WorkspaceContext;
+use App\Enums\ReviewSchemaVersion;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Workspaces\CreateWorkspaceRequest;
 use App\Models\Workspace;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -92,6 +94,9 @@ class WorkspaceController extends Controller
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'llm_provider' => ['sometimes', 'in:anthropic,openai'],
+            // W7-T5: per-workspace v2 rollout toggle. Defaults to v1; admins flip to v2 once
+            // rabbit:eval baseline is green for both providers.
+            'review_schema_version' => ['sometimes', Rule::enum(ReviewSchemaVersion::class)],
             // AC28: scm_provider is immutable after Workspace creation. Rejected with 422 when sent.
             'scm_provider' => ['prohibited'],
         ]);
