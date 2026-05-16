@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ReviewSchemaVersion;
 use App\Enums\ScmProvider;
 use App\Enums\WorkspaceHealth;
 use Database\Factories\WorkspaceFactory;
@@ -33,6 +34,7 @@ class Workspace extends Model
         'daily_token_cap',
         'daily_token_cap_alert_threshold',
         'llm_provider',
+        'review_schema_version',
     ];
 
     protected function casts(): array
@@ -43,6 +45,7 @@ class Workspace extends Model
             'webhook_secret' => 'encrypted',
             'kill_switch_enabled' => 'boolean',
             'health' => WorkspaceHealth::class,
+            'review_schema_version' => ReviewSchemaVersion::class,
         ];
     }
 
