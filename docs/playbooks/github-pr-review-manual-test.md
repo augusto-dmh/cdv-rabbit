@@ -76,8 +76,8 @@ Browse to https://github.com/settings/apps/new and fill in (substitute
 |---|---|
 | GitHub App name | `cdv-rabbit-bot-dev` |
 | Homepage URL | `https://abc-123.ngrok-free.app` |
-| **Callback URL** | `https://abc-123.ngrok-free.app/scm/github/install/callback` |
-| Setup URL | _(leave blank)_ |
+| **Setup URL** | `https://abc-123.ngrok-free.app/scm/github/install/callback` |
+| Callback URL | _(leave blank — we don't use the OAuth flow)_ |
 | **Webhook URL** | `https://abc-123.ngrok-free.app/scm/github/webhook` |
 | **Webhook secret** | generate something random (e.g. `openssl rand -hex 32`) — **save it** |
 | Where can this GitHub App be installed? | **Only on this account** (it's a dev App for your `augusto-dmh` account only; "Any account" is for the eventual v0.3 self-service SaaS) |
@@ -431,7 +431,7 @@ Re-install to recover: repeat step 7.
 |---|---|---|
 | 401 on the webhook | `GITHUB_APP_WEBHOOK_SECRET` mismatch | Re-paste the secret from the App page into `.env`, `php artisan config:clear` |
 | 404 webhook | URL still pointing to old ngrok | Re-paste the new ngrok URL in the App's Webhook URL field |
-| Callback shows 403 | Replayed state token (nonce is single-use) | Click **Install on GitHub** again from the workspace page |
+| Callback shows 403 | Session marker missing or already consumed (single-use; refreshing the Setup URL after a successful install retriggers this) | Click **Install on GitHub** again from the workspace page to re-stash the marker |
 | Callback shows 409 | This installation_id is already mapped to another Workspace row | Either reuse that workspace or uninstall + reinstall the App |
 | Review job fails on `getDiff` | App not granted access to DocInt | On github.com/settings/installations → **Configure** → grant repo access |
 | Webhook arrives but no review starts | Worker not running (`php artisan queue:work` terminal closed) | Restart the worker on the `reviews` queue |

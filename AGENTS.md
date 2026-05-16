@@ -98,7 +98,7 @@ cdv-rabbit gained GitHub Cloud as a second SCM Provider alongside Bitbucket Clou
 | W6-T3 | BitbucketClient → BitbucketDriver (DTOs); call sites rewired | `f09e8fb` |
 | W6-T4 | GithubDriver + JwtSigner (RS256 native) + InstallationTokenCache | `9efd470` |
 | W6-T5 | Github/WebhookController + WebhookIngestionPipeline + uninstall | `19d2df8` |
-| W6-T6 | Scm/Github/InstallController + StateTokenSigner + AC27/AC28 | `a60debb` |
+| W6-T6 | Scm/Github/InstallController (session-based) + AC27/AC28 | `a60debb` |
 | W6-T7 | Phase 6 verifier — arch invariants + AC matrix scanner | `1630399` |
 
 Phase 6 verifier: 397 tests, 1199 assertions, all green. The 113 Phase 2 BB tests still pass after the rename + DTO reshape.
