@@ -26,7 +26,9 @@ type Workspace = {
     health: string;
     kill_switch_enabled: boolean;
     llm_provider: string;
+    scm_provider: 'bitbucket_cloud' | 'github_cloud';
     scm_owner_slug: string | null;
+    github_installation_id: string | null;
     bitbucket_service_account: string | null;
 };
 
@@ -82,12 +84,22 @@ function updateProvider(provider: string): void {
                 <Badge v-else variant="destructive">{{ workspace.health }}</Badge>
             </div>
 
-            <Button v-if="!workspace.scm_owner_slug" as-child variant="default">
-                <Link :href="ConnectController.edit.url(workspace.slug)">Connect Bitbucket</Link>
-            </Button>
-            <Button v-else as-child variant="outline" size="sm">
-                <Link :href="ConnectController.edit.url(workspace.slug)">Manage connection</Link>
-            </Button>
+            <template v-if="workspace.scm_provider === 'bitbucket_cloud'">
+                <Button v-if="!workspace.scm_owner_slug" as-child variant="default">
+                    <Link :href="ConnectController.edit.url(workspace.slug)">Connect Bitbucket</Link>
+                </Button>
+                <Button v-else as-child variant="outline" size="sm">
+                    <Link :href="ConnectController.edit.url(workspace.slug)">Manage connection</Link>
+                </Button>
+            </template>
+            <template v-else>
+                <Button v-if="!workspace.github_installation_id" as-child variant="default">
+                    <Link :href="`/workspaces/${workspace.slug}/connect-github`">Connect GitHub</Link>
+                </Button>
+                <Button v-else as-child variant="outline" size="sm">
+                    <Link :href="`/workspaces/${workspace.slug}/connect-github`">Manage installation</Link>
+                </Button>
+            </template>
         </div>
 
         <Card v-if="isAdmin">

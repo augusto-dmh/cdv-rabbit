@@ -6,7 +6,7 @@
 > file describes the target; the git log describes the past;
 > this file bridges them.
 
-- **Last updated:** 2026-05-15 (Phase 6 planned — multi-SCM provider spec ratified)
+- **Last updated:** 2026-05-16 (Phase 6 shipped — multi-SCM provider tag `phase-6-complete`)
 - **Test suite:** 329 tests, 1029 assertions, all green on tag `phase-5-complete`
 - **Repo:** https://github.com/augusto-dmh/cdv-rabbit (private)
 - **Branch:** `main` only (trunk-based, no PR workflow yet)
@@ -85,11 +85,25 @@ The plan runs 5 phases over 4–6 weeks:
 
 🎉 **MVP CODE COMPLETE.** All 5 phases shipped, all 26 acceptance criteria covered, 329/1029 tests green. Remaining items before GA are operational sign-offs listed in plan §12.
 
-### Phase 6 (planned) — Multi-SCM Provider Support
+### Phase 6 — Multi-SCM Provider Support — ✅ COMPLETE (tag `phase-6-complete`)
 
-cdv-rabbit gains GitHub Cloud as a second SCM Provider alongside Bitbucket Cloud. Provider is chosen per Workspace at creation and immutable thereafter via `workspaces.scm_provider` enum. Both providers implement `ScmDriverInterface` (flat wide surface, normalized DTOs) and are resolved via `ScmDriverFactory::make(Workspace)`, mirroring the `LlmDriverFactory` precedent. GitHub auth is via GitHub App (not PAT) with per-Workspace `github_installation_id`. Webhook controllers are split per provider; the HMAC scheme becomes asymmetric (per-Workspace for BB, per-App for GH). Source of truth: `specs/multi-scm-provider-support.md`. Design decisions: `docs/adr/0001-strict-1-to-1-workspace-and-scm-owner.md` through `docs/adr/0004-scm-driver-interface-shape.md`. Glossary: `CONTEXT.md`. New ACs: AC27..AC38.
+cdv-rabbit gained GitHub Cloud as a second SCM Provider alongside Bitbucket Cloud. Provider is chosen per Workspace at creation and immutable thereafter via `workspaces.scm_provider` enum. Both providers implement `ScmDriverInterface` (flat wide surface, normalized DTOs) and are resolved via `ScmDriverFactory::make(Workspace)`, mirroring the `LlmDriverFactory` precedent. GitHub auth is via GitHub App (not PAT) with per-Workspace `github_installation_id`. Webhook controllers are split per provider; the HMAC scheme is asymmetric (per-Workspace for BB, per-App for GH). Source of truth: `specs/multi-scm-provider-support.md`. Design decisions: `docs/adr/0001-strict-1-to-1-workspace-and-scm-owner.md` through `docs/adr/0004-scm-driver-interface-shape.md`. Glossary: `CONTEXT.md`. New ACs: AC27..AC38 — all covered by named Pest tests, verified by `tests/Feature/Scm/Phase6AcMatrixTest.php`.
 
-**Implementation gated on**: §7 operational sign-offs + GitHub App "cdv-rabbit-bot" registration + GitHub DPA. No code changes yet — spec + ADRs + glossary only.
+#### W6 task graph + status (all complete)
+
+| ID | Title | Commit |
+|---|---|---|
+| W6-T1 | Schema migrations + ScmProvider enum + model/factory updates | `b1038b6` |
+| W6-T2 | ScmDriverInterface + 7 DTOs + ScmDriverFactory + exception | `905d24d` |
+| W6-T3 | BitbucketClient → BitbucketDriver (DTOs); call sites rewired | `f09e8fb` |
+| W6-T4 | GithubDriver + JwtSigner (RS256 native) + InstallationTokenCache | `9efd470` |
+| W6-T5 | Github/WebhookController + WebhookIngestionPipeline + uninstall | `19d2df8` |
+| W6-T6 | Scm/Github/InstallController + StateTokenSigner + AC27/AC28 | `a60debb` |
+| W6-T7 | Phase 6 verifier — arch invariants + AC matrix scanner | `1630399` |
+
+Phase 6 verifier: 397 tests, 1199 assertions, all green. The 113 Phase 2 BB tests still pass after the rename + DTO reshape.
+
+**Production gating** (operational, NOT code): GitHub App "cdv-rabbit-bot" registered at github.com/settings/apps with `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_WEBHOOK_SECRET`, `GITHUB_APP_SLUG` populated in env; GitHub DPA signed and `GITHUB_DPA_URL` populated (LGPD check #10).
 
 ### W1 task graph + status (all complete)
 

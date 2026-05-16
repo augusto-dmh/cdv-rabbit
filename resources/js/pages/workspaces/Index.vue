@@ -90,6 +90,24 @@ defineOptions({
                     <InputError :message="errors.slug" />
                 </div>
 
+                <div class="grid gap-2">
+                    <Label>SCM provider</Label>
+                    <div class="flex gap-4 rounded-md border p-3 text-sm">
+                        <label class="flex cursor-pointer items-center gap-2">
+                            <input type="radio" name="scm_provider" value="bitbucket_cloud" checked required />
+                            Bitbucket Cloud
+                        </label>
+                        <label class="flex cursor-pointer items-center gap-2">
+                            <input type="radio" name="scm_provider" value="github_cloud" />
+                            GitHub Cloud
+                        </label>
+                    </div>
+                    <p class="text-xs text-muted-foreground">
+                        Once chosen, the SCM provider is permanent on this workspace — moving between providers requires creating a new workspace.
+                    </p>
+                    <InputError :message="errors.scm_provider" />
+                </div>
+
                 <Button type="submit" :disabled="processing">
                     <Plus class="mr-2 h-4 w-4" />
                     Create workspace

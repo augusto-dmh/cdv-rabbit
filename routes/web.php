@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\KillSwitchController;
 use App\Http\Controllers\Health\HealthController;
 use App\Http\Controllers\Reviews\ReviewController;
+use App\Http\Controllers\Scm\Github\InstallController as GithubInstallController;
 use App\Http\Controllers\Workspaces\ConnectController;
 use App\Http\Controllers\Workspaces\RepositoryController;
 use App\Http\Controllers\Workspaces\WorkspaceController;
@@ -27,6 +28,8 @@ Route::middleware(['auth', 'verified', 'workspace.member'])
         Route::get('connect', [ConnectController::class, 'edit'])->name('workspaces.connect.edit');
         Route::put('connect', [ConnectController::class, 'update'])->name('workspaces.connect.update');
         Route::delete('connect', [ConnectController::class, 'destroy'])->name('workspaces.connect.destroy');
+
+        Route::get('connect-github', [GithubInstallController::class, 'show'])->name('workspaces.connect-github.edit');
 
         Route::get('repositories', [RepositoryController::class, 'index'])->name('workspaces.repositories.index');
         Route::post('repositories/sync', [RepositoryController::class, 'sync'])->name('workspaces.repositories.sync');

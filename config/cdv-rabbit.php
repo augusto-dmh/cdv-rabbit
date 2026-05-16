@@ -36,4 +36,11 @@ return [
      * The rabbit:lgpd-check command fails until this is populated when any workspace uses OpenAI.
      */
     'openai_dpa_url' => env('OPENAI_DPA_URL'),
+
+    /*
+     * GitHub Data Processing Agreement URL.
+     * Operators must set GITHUB_DPA_URL before enabling any workspace with scm_provider=github_cloud.
+     * The rabbit:lgpd-check command fails until this is populated when any workspace uses GitHub.
+     */
+    'github_dpa_url' => env('GITHUB_DPA_URL'),
 ];

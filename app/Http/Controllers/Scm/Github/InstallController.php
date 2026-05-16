@@ -12,10 +12,26 @@ use App\Services\Scm\ScmDriverFactory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response as InertiaResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class InstallController extends Controller
 {
+    /**
+     * Render the GitHub install landing page for a workspace.
+     */
+    public function show(Request $request, Workspace $workspace): InertiaResponse
+    {
+        if (! $workspace->users()->where('user_id', $request->user()->id)->exists()) {
+            abort(403);
+        }
+
+        return Inertia::render('workspaces/ConnectGithub', [
+            'workspace' => $workspace->only('id', 'name', 'slug', 'github_installation_id'),
+        ]);
+    }
+
     /**
      * AC29 — Build a signed state token and redirect the admin's browser to the
      * GitHub App install URL. Only Workspace admins may initiate the flow.

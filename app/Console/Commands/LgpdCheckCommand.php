@@ -41,6 +41,7 @@ class LgpdCheckCommand extends Command
             'Retention command scheduled daily' => $this->checkRetentionScheduled(),
             'Anthropic DPA URL configured' => $this->checkAnthropicDpaUrl(),
             'OpenAI DPA URL configured (when workspaces use OpenAI)' => $this->checkOpenAiDpaUrl(),
+            'GitHub DPA URL configured (when workspaces use GitHub)' => $this->checkGithubDpaUrl(),
             'DPO sign-off on record (< 1 year)' => $this->checkDpoSignoff(),
         ];
 
@@ -199,6 +200,24 @@ class LgpdCheckCommand extends Command
         }
 
         return [true, 'openai_dpa_url is set'];
+    }
+
+    /** @return array{bool, string} */
+    private function checkGithubDpaUrl(): array
+    {
+        $hasGithubWorkspace = DB::table('workspaces')->where('scm_provider', 'github_cloud')->exists();
+
+        if (! $hasGithubWorkspace) {
+            return [true, 'No workspaces use GitHub — check not required'];
+        }
+
+        $url = config('cdv-rabbit.github_dpa_url');
+
+        if (empty($url)) {
+            return [false, 'Env var GITHUB_DPA_URL not set (required when any workspace uses GitHub)'];
+        }
+
+        return [true, 'github_dpa_url is set'];
     }
 
     /** @return array{bool, string} */
