@@ -12,7 +12,7 @@
 A 200-LOC PR with 3 real issues produces a Review containing a Walkthrough, 3 Findings (line-anchored, severity-tagged), and 0-N Nitpicks (collapsed in summary) — where v1 returned "no significant issues found". The eval harness proves recall >= 0.7 on 10 golden PRs across both providers before any v2 prompt change merges.
 
 ### 1.4. Version & owner
-`v1.0 – Phase 7 (pre-implementation). Author: augusto-dmh. ADR: docs/adr/0005-review-pipeline-v2-recall-stance-and-critique-pass.md.`
+`v1.2 – Phase 7 (post-implementation, real-world reconciled). Author: augusto-dmh. ADR: docs/adr/0005-review-pipeline-v2-recall-stance-and-critique-pass.md.`
 
 ---
 
@@ -159,14 +159,19 @@ Operator curates 10 golden PRs → runs `rabbit:eval --schema=v2 --provider=anth
 - `config/cdv-rabbit/prompts/review_v2.txt` — high-recall prompt with few-shot exemplars.
 
 ### 7.3. New DTOs
-- `App\Services\Llm\Dto\DraftReviewDto` — wraps the raw v2 tool output before critique.
-- `App\Services\Llm\Dto\CritiqueResultDto` — per-Finding `approve|reject` verdicts + filtered findings list.
-- `App\Services\Llm\Dto\JudgeResultDto` — per-Finding `match|miss|hallucination` verdicts for eval.
+- `App\Services\Llm\Dto\DraftReviewDto` — wraps the raw v2 tool output before critique (summary + findings + nitpicks + telemetry).
+- `App\Services\Llm\Dto\CritiqueResultDto` — per-Finding `approve|reject` verdicts; exposes `approvedFindingIndices()` + `rejectedFindings(DraftReviewDto)`.
+- `App\Services\Llm\Dto\ReviewFindingDto` — single Finding (path, line, severity, category, message, nullable suggestion).
+- `App\Services\Llm\Dto\ReviewNitpickDto` — single Nitpick (path, line, message).
+- `App\Services\Llm\Dto\ReviewSummaryV2Dto` — v2 summary (overview + risk_level + walkthrough + files_analyzed[]).
+- LLM-judge verdicts are returned as plain arrays from `App\Services\Eval\LlmJudge::judge()` — no dedicated DTO class (kept light because the eval surface is a single consumer).
 
 ### 7.4. Extended contracts
-- `LlmDriverInterface` gains: `critiqueDraft(DraftReviewDto): CritiqueResultDto`.
-- Both `ClaudeReviewer` and `OpenAiReviewer` implement `critiqueDraft()`.
-- `LlmCallTelemetry` — `role` enum gains `critique` value alongside existing `triage|review|summary`.
+- `LlmDriverInterface` gains: `reviewDiffV2(string, array, string): DraftReviewDto` AND `critiqueDraft(string, array, string): CritiqueResultDto`. Both implemented by `ClaudeReviewer` and `OpenAiReviewer`. Each driver also exposes `getReviewSystemPromptForVersion('v1'|'v2')`, `getReviewToolSchemaForVersion('v1'|'v2')`, `getCriticSystemPrompt()`, and `getCriticToolSchema()` so the job picks the right artifacts per call.
+- `LlmCallRole` enum (PHP-side authoritative) gains `Draft` (`'draft'`) and `Critique` (`'critique'`) alongside existing `Triage|Review|Summary`. Persisted in `reviews_llm_calls.role` widened from `enum(...)` to plain `varchar(16)` via the W7-T2-followup migration `000004_widen_reviews_llm_calls_role.php`.
+- `PromptBuilder::wrap(string $diff, array $prMetadata, bool $annotateLines = false): string` — extended with an opt-in `annotateLines` flag. When true, every `+` line in the diff is prefixed with its absolute head-side line number as `+[L<N>] <content>` via the private `annotateLineNumbers()` helper. v2 path passes `annotateLines: true`; v1 path stays `false` (AGENTS.md §4 v1 freeze).
+- `App\Services\Review\DiffPositionResolver` — new opportunistic pre-flight resolver for `(path, line)` corrections. Constructor takes `list<FileDiff>`. `resolve(string $path, int $line): ?array{path,line}` snaps namespace-cased paths (`App/...`) to filesystem casing (`app/...`) via a case-insensitive lookup, AND snaps off-by-a-few lines to the nearest `+` line within ±5. Wired into `CommentPoster::postV2()` as an optional 5th argument; legacy callers pass null and get pass-through behaviour. Strictly additive: Findings only get better, never blocked.
+- `CommentPoster::postV2()` — adds an SCM-failure fallback path. When the SCM driver throws `RuntimeException` on an inline post (typical: GitHub 422 "path could not be resolved"), the Finding is folded into a `<details>` block in the summary body rather than crashing the whole review. `tryPostInlineFinding()` is the new internal helper that wraps the post + logs `CommentPoster: inline post fell back to summary` at warning level.
 
 ### 7.5. Existing contracts preserved
 - `review_result_v1.json` frozen (AC23 snapshot test unchanged).
@@ -180,17 +185,18 @@ Operator curates 10 golden PRs → runs `rabbit:eval --schema=v2 --provider=anth
 
 ### 8.1. Draft call (v2)
 - Model: workspace's configured provider (Sonnet 4.6 for Anthropic, GPT-4o for OpenAI).
-- System prompt: `review_v2.txt` (high-recall stance + 7 few-shot exemplars).
+- System prompt: `review_v2.txt` (high-recall stance + 7 few-shot exemplars + line-number protocol).
 - Tool/schema: `review_result_v2` with strict mode.
 - Prompt caching: same `cache_control: ephemeral` pattern as v1 (§3.0.2). Tool name change (`review_result_v2`) automatically invalidates v1 caches.
-- User message: same XML envelope (`<pr_metadata>` + `<diff>`) as v1 (§3.0.5).
+- User message: XML envelope (`<pr_metadata>` + `<diff>`) as v1 (§3.0.5), but the `<diff>` body is **line-annotated**: every `+` line is prefixed with `+[L<N>] <content>` where `N` is the absolute head-side line number. The prompt instructs the model to copy `N` verbatim into `findings[].line` rather than counting. Annotation is performed by `PromptBuilder::annotateLineNumbers()` (called only on the v2 path).
 
 ### 8.2. Critique call (v2)
 - Model: same provider and model as draft (same-provider constraint from ADR 0005).
-- System prompt: critique-specific instructions embedded in `review_v2.txt` (second system block, cached separately).
-- Input: original diff + draft review JSON.
+- System prompt: `critic_v1.txt` — a **separate** frozen artifact under `config/cdv-rabbit/prompts/`. Cached as its own ephemeral prefix, independent of the draft's cache.
+- Tool/schema: `critic_result_v1.json` — a separate frozen artifact under `config/cdv-rabbit/schemas/`. Same OpenAI-strict intersection rules as `review_result_v2.json` (required fields, no optionals, no extra properties).
+- Input: the draft review's findings array + the original unified diff, packaged as the user message via `PromptBuilder::wrap()` (annotation not applied — the critic operates on Findings, not on raw `+` lines).
 - Output: per-Finding verdict (`approve` / `reject` with `reason`).
-- Prompt caching: the critique system prompt + tool schema form a separate cached prefix. The draft review JSON is the uncached user message.
+- Failure handling: if the critique call throws (timeout, 5xx, schema validation failure), the job catches and posts the **unfiltered** draft (AC47). `error_class=critique_failed` is persisted in `reviews_llm_calls`. The review still completes; the author sees the draft's full Findings list.
 
 ### 8.3. Few-shot exemplar design
 - 5 positive exemplars: real Laravel code snippets with known issues (N+1 query, missing authorization, SQL injection via raw query, missing validation, race condition in Redis). Each shows the expected Finding with correct severity/category.
@@ -350,6 +356,9 @@ ReviewPullRequestJob::handle()
 | Few-shot exemplars may not generalize beyond Laravel codebases | Exemplars are the starting point; eval harness quantifies generalization; workspace-specific exemplars are backlog. |
 | Golden PR corpus too small (10 PRs) | Sufficient for MVP signal; corpus grows as v2 is piloted. |
 | v1 → v2 migration could confuse developers used to the old format | Per-Workspace opt-in; admin controls rollout pace; Walkthrough is strictly additive. |
+| LLM miscounts absolute line numbers in long diffs (~30+ lines), causing SCM to reject the inline anchor with 422 | `PromptBuilder::annotateLineNumbers()` prefixes every `+` line with `+[L<N>]` so the model copies, not counts. Validated live on DocInt PR #36 + #37. |
+| LLM emits namespace-cased path (`App/...`) instead of filesystem casing (`app/...`); GitHub paths are case-sensitive | `DiffPositionResolver` opportunistically snaps path via case-insensitive lookup against actual diff paths, plus ±5-line snap to the nearest valid `+` line. |
+| Off-the-happy-path inline post failures crash the whole review and post a "review failed" comment | `CommentPoster::postV2()` catches `RuntimeException` from the SCM driver and folds the affected Finding into a `<details>` block in the summary body; review still completes with `status_check_state=success` where applicable. |
 
 **Open questions:**
 - Should the critique call receive the full diff or only the draft review JSON? ADR 0005 says "original diff + draft review". Confirm during W7-T4 implementation.
@@ -361,3 +370,11 @@ ReviewPullRequestJob::handle()
 
 - **v1.0 (2026-05-16 / pre-implementation)** — Initial spec authored from `grill-with-docs` session decisions locked in ADR 0005. 12 new ACs (AC39..AC50). No code changes yet; implementation gated on W7-T1 (eval harness ships first). Glossary terms (Review, Walkthrough, Finding, Nitpick) from CONTEXT.md used throughout. Dual-provider symmetry (Anthropic + OpenAI) documented in every section.
 - **v1.1 (2026-05-16 / pre-implementation)** — Added AC51 (commit status check on PR head SHA) after the user surfaced that consumer repos (e.g. DocInt) have auto-merge enabled and v2's ~75s p95 latency would make reviews land post-merge without a status-check gate. Operational rationale in `.omc/plans/cdv-rabbit-review-pipeline-v2.md` §6.1. Total ACs now 13 (AC39..AC51).
+- **v1.2 (2026-05-16 / post-implementation)** — Reconciled with the real-world dry-runs on DocInt PR #36 (1 file, +63) and PR #37 (8 files, +315). Three production-blocking bugs were fixed in-line on the branch and are now reflected here:
+  - **`a497602`** — OpenAi-strict-intersection schema (`{type: ['string','null']}`) crashed `OpenAiReviewAgent::translateNode()` because the laravel/ai type-tree translator only handled single-string types. Fixed via a nullable-union detector that strips `null` and propagates via `Type::nullable()`. The W7-T4 no-op migration for `reviews_llm_calls.role` was also wrong (SQLite enforces `enum(...)` as a CHECK constraint) — replaced by a real `widen_reviews_llm_calls_role` migration. §7.4 contracts updated.
+  - **`f8082b5`** — `CommentPoster::postV2()` now catches SCM 422s on inline posting and folds the rejected Finding into a `<details>` summary section instead of crashing the review. §7.4 and §14 updated. Tracks AC47-adjacent fail-open behaviour but at the posting layer, not the critic layer.
+  - **`653c261`** — `PromptBuilder::annotateLineNumbers()` (new) prefixes every `+` line with `+[L<N>]` so the LLM doesn't count. `DiffPositionResolver` (new component in `app/Services/Review/`) opportunistically snaps namespace-cased paths to filesystem casing AND snaps off-by-a-few lines to the nearest `+` line within ±5. Both are strictly additive — Findings only get better. `review_v2.txt` gains a "Line-number protocol" section explaining the `[L<N>]` annotation contract. §7.4, §8.1, §14 updated.
+
+  Outcome: DocInt PR #36 produced 2 inline comments (lines 25, 58) with correct severity/category/AI marker. DocInt PR #37 produced 7 inline comments + a structured HIGH-risk summary with Walkthrough naming all major concerns; recall ~7/13 substantive plants, zero false positives.
+
+  No new ACs in v1.2 — the fixes operationalise existing AC45/AC46/AC47/AC48 behaviour against real APIs. Suite still 460/460 green; test fakes were updated where they bypassed the SDK type-translator (Task #6 in the session task list). All three fixes are atomic commits on the same branch and ride into Phase 7's single PR.
