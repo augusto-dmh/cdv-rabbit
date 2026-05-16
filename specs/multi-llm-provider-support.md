@@ -135,9 +135,9 @@ Admin navigates to workspace settings → selects `OpenAI GPT-4o` from dropdown 
 - Trigger: `reviewDiff()` called from orchestrator.
 - Behaviour:
   - Uses `OpenAiReviewAgent` with `#[Provider(Lab::OpenAI)] #[Model('gpt-4o')] #[MaxTokens(4096)]` attributes.
-  - Applies `providerOptions(['response_format' => ['type'=>'json_schema', 'json_schema'=>['name'=>'review_result', 'strict'=>true, 'schema'=>$this->getToolSchema()]]])`.
+  - Agent implements `Laravel\Ai\Contracts\HasStructuredOutput`. Its `schema(JsonSchema $schema)` method translates the project's JSON-Schema array (`review_result_v1.json`) into the `Illuminate\JsonSchema\Types\Type` tree the SDK feeds into the Responses-API `body.text.format`. **Not** `HasProviderOptions` injecting `response_format` — that is the Chat-Completions key and is silently rejected by the OpenAI gateway's `/responses` endpoint (see `docs/upstream/laravel-ai/`).
   - Note: OpenAI has no prompt-caching equivalent. `cacheCreationInputTokens=0`, `cacheReadInputTokens=0` always.
-  - Streams response via same pattern as ClaudeReviewer.
+  - Uses non-streaming `prompt()` (laravel/ai rejects `stream()` + `HasStructuredOutput` with "Streaming structured output is not currently supported").
   - Returns identical `ReviewResultDto` (cache token fields = 0 for OpenAI).
 - Output: parsed review result, telemetry recorded.
 
@@ -246,7 +246,7 @@ Admin navigates to workspace settings → selects `OpenAI GPT-4o` from dropdown 
 
 ### 8.2. Tool/schema equivalence
 - Tool schema (`review_result_v1.json`) is identical across providers (both Anthropic and OpenAI support JSON schema strict mode).
-- Anthropic uses `tool_choice` force; OpenAI uses `response_format` JSON schema.
+- Anthropic uses `tool_choice` force (via `HasProviderOptions`); OpenAI uses laravel/ai's `HasStructuredOutput` contract, which the SDK renders as Responses-API `body.text.format`. The same project-side JSON Schema feeds both paths.
 - System prompt is identical (no provider-specific tuning in MVP).
 
 ### 8.3. Error handling
@@ -255,7 +255,8 @@ Admin navigates to workspace settings → selects `OpenAI GPT-4o` from dropdown 
 - Both map to same `RetryDecision` enum → orchestrator is provider-agnostic.
 
 ### 8.4. Streaming
-- Both providers stream responses; orchestrator consumes via `.stream()->then(cb)->foreach(...)` pattern (same for both).
+- Anthropic streams responses; `ClaudeReviewer` consumes via the `.stream()->then(cb)->foreach(...)` pattern.
+- OpenAI uses non-streaming `prompt()`. laravel/ai v0.6.8 throws `InvalidArgumentException("Streaming structured output is not currently supported")` when `stream()` is combined with `HasStructuredOutput`, and structured output is non-negotiable for us (it's how the orchestrator parses the response into `ReviewResultDto`). `OpenAiReviewer` therefore awaits the final `AgentResponse` directly. Downstream consumers (telemetry, parser) operate on the aggregated response in both paths.
 
 ---
 

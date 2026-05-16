@@ -74,7 +74,6 @@ A naïve attempt to make the GitHub driver pretend to be a BB clone (per-Workspa
 - Tests under `tests/Feature/Github/`, `tests/Feature/Scm/Github/`, `tests/Unit/Services/Scm/` covering AC29..AC38 GH-side.
 
 ### 3.2. Out-of-scope for this iteration
-- Auto-population of `workspaces.scm_owner_slug` from the install callback (currently the field is left null on GH workspaces; the playbook documents a tinker workaround). Tracked in §14 as an open question.
 - A success toast on the workspace page after a healthy callback round-trip (UX parity gap with BB connect; documented in §14).
 - `installation.suspend` handling (treat as ignored event in v1.0).
 - Multi-installation per Workspace (rejected by `docs/adr/0001-strict-1-to-1-workspace-and-scm-owner.md`).
@@ -136,7 +135,7 @@ Admin logs in → "Workspaces" → "+ New" form with `scm_provider=github_cloud`
 - 11 contract methods returning normalised DTOs. The `scmRepoId` parameter is the GitHub numeric repository id stored as a string.
 - `verifyCredentials()` calls `GET /installation/repositories?per_page=1`. On 2xx, returns `CredentialCheck(valid=true, identity="gh-installation:{id}")`. On 4xx/5xx, returns invalid with the status code in `reason`.
 - `listRepositories()` paginates `GET /installation/repositories?per_page=100` via the `Link: ...; rel="next"` header.
-- `getPullRequest`, `getChangedFiles`, `getDiff` use the workspace's `scm_owner_slug` plus the resolved repo name (looked up by `scm_repo_id` from the `repositories` table) to construct URLs like `/repos/{owner}/{repo}/pulls/{n}`.
+- `getPullRequest`, `getChangedFiles`, `getDiff` resolve both owner and repo name from `repositories.full_name` ("owner/name") captured at sync time, keyed by `scm_repo_id`. Two private helpers — `resolveOwner($scmRepoId)` and `resolveRepoName($scmRepoId)` — encapsulate the lookup and construct URLs like `/repos/{owner}/{repo}/pulls/{n}`. `workspaces.scm_owner_slug` is **not** consulted on the GH driver path (the column is Bitbucket-specific and stays null on GH workspaces).
 - `getDiff()` requests `Accept: application/vnd.github.v3.diff` on the PR endpoint and returns the raw unified diff body.
 - `postPullRequestComment()` posts to `POST /repos/{owner}/{repo}/issues/{n}/comments` (GitHub treats top-level PR comments as issue comments).
 - `postInlineComment()` posts to `POST /repos/{owner}/{repo}/pulls/{n}/comments` with `{commit_id: payload.headSha, path, line, side: 'RIGHT', body}`. `side=RIGHT` is hardcoded — v1.0 only comments on additions/context.
@@ -329,7 +328,7 @@ Manual smoke: `docs/playbooks/github-pr-review-manual-test.md` against a real re
 
 Open questions:
 
-- **scm_owner_slug not auto-populated on install**: the callback doesn't extract the installation's account login (the field comes through `GET /installation` after credential exchange). The playbook documents a tinker workaround. Should the callback derive `scm_owner_slug` from the installation metadata? Likely yes, but adds an extra API call to the callback path; revisit when the manual workaround starts hurting.
+- **`scm_owner_slug` on GH workspaces**: the column is Bitbucket-specific and the GH driver no longer reads it (owner is derived from `repositories.full_name` at request time). The column is left null on GH workspaces. Open question is whether to repurpose it for display/audit (e.g. showing the org name in the workspace header) — defer until a concrete UI need surfaces.
 - **No success toast on the workspace page after a healthy callback**: UX parity gap with BB connect. A small `Inertia::flash('toast', ...)` before the redirect would close this.
 - **`installation_id` cache invalidation on 401**: when GitHub revokes a token mid-cache-TTL (e.g. admin re-installs with new permissions), the next API call 401s and the job fails. Backlog: detect 401 in driver, call `InstallationTokenCache::forget`, retry once.
 - **`installation.suspend` / `installation.new_permissions_accepted` events**: silently ignored today. Revisit if pilot use surfaces a need.
