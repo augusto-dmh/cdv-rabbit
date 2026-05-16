@@ -114,7 +114,7 @@ class GithubDriver implements ScmDriverInterface
 
     public function getPullRequest(string $scmRepoId, int $prNumber): ?PullRequestDto
     {
-        $owner = $this->workspace->scm_owner_slug ?? '';
+        $owner = $this->resolveOwner($scmRepoId);
         $repoName = $this->resolveRepoName($scmRepoId);
         $response = $this->request('GET', "/repos/{$owner}/{$repoName}/pulls/{$prNumber}");
         $this->captureRateLimitHeaders($response);
@@ -136,7 +136,7 @@ class GithubDriver implements ScmDriverInterface
 
     public function getChangedFiles(string $scmRepoId, int $prNumber): Collection
     {
-        $owner = $this->workspace->scm_owner_slug ?? '';
+        $owner = $this->resolveOwner($scmRepoId);
         $repoName = $this->resolveRepoName($scmRepoId);
         $results = [];
         $url = "/repos/{$owner}/{$repoName}/pulls/{$prNumber}/files?per_page=100";
@@ -171,7 +171,7 @@ class GithubDriver implements ScmDriverInterface
 
     public function getDiff(string $scmRepoId, int $prNumber): ?string
     {
-        $owner = $this->workspace->scm_owner_slug ?? '';
+        $owner = $this->resolveOwner($scmRepoId);
         $repoName = $this->resolveRepoName($scmRepoId);
         $response = $this->request('GET', "/repos/{$owner}/{$repoName}/pulls/{$prNumber}", accept: 'application/vnd.github.v3.diff');
         $this->captureRateLimitHeaders($response);
@@ -191,7 +191,7 @@ class GithubDriver implements ScmDriverInterface
 
     public function postPullRequestComment(string $scmRepoId, int $prNumber, string $body): CommentHandle
     {
-        $owner = $this->workspace->scm_owner_slug ?? '';
+        $owner = $this->resolveOwner($scmRepoId);
         $repoName = $this->resolveRepoName($scmRepoId);
 
         $response = $this->request('POST', "/repos/{$owner}/{$repoName}/issues/{$prNumber}/comments", [
@@ -212,7 +212,7 @@ class GithubDriver implements ScmDriverInterface
 
     public function postInlineComment(string $scmRepoId, int $prNumber, InlineCommentPayload $payload): CommentHandle
     {
-        $owner = $this->workspace->scm_owner_slug ?? '';
+        $owner = $this->resolveOwner($scmRepoId);
         $repoName = $this->resolveRepoName($scmRepoId);
 
         $response = $this->request('POST', "/repos/{$owner}/{$repoName}/pulls/{$prNumber}/comments", [
@@ -239,7 +239,7 @@ class GithubDriver implements ScmDriverInterface
 
     public function updateComment(string $scmRepoId, int $prNumber, CommentHandle $handle, string $body): CommentHandle
     {
-        $owner = $this->workspace->scm_owner_slug ?? '';
+        $owner = $this->resolveOwner($scmRepoId);
         $repoName = $this->resolveRepoName($scmRepoId);
 
         // GitHub PR review comments are updated via /pulls/comments/{cid} regardless of PR number.
@@ -382,6 +382,24 @@ class GithubDriver implements ScmDriverInterface
         $segments = explode('/', (string) $repo->full_name, 2);
 
         return $segments[1] ?? $scmRepoId;
+    }
+
+    /**
+     * Resolve the GitHub owner login (org or user) for a synced repository.
+     *
+     * GitHub workspaces don't populate `workspaces.scm_owner_slug` (that column
+     * is the Bitbucket workspace handle); the canonical owner lives in
+     * `repositories.full_name` ("owner/name") captured during sync.
+     */
+    private function resolveOwner(string $scmRepoId): string
+    {
+        $repo = Repository::where('scm_repo_id', $scmRepoId)->first();
+
+        if ($repo === null) {
+            return (string) ($this->workspace->scm_owner_slug ?? '');
+        }
+
+        return explode('/', (string) $repo->full_name, 2)[0] ?? '';
     }
 
     /** @param  array<string, mixed>  $r */
