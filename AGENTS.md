@@ -48,6 +48,8 @@ from migration 0001.
    - `tenancy-and-workspace-isolation.md` (Phase 1)
    - `lgpd-data-protection-posture.md` (Phase 1 + 3)
    - `bitbucket-cloud-integration.md` (Phase 2)
+   - `github-cloud-integration.md` (Phase 6)
+   - `multi-scm-provider-support.md` (Phase 6)
    - `ai-code-review-pipeline.md` (Phase 3)
    - `cost-management-and-ceiling-alerts.md` (Phase 3)
    - `review-dashboard.md` (Phase 4)
