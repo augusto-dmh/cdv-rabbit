@@ -64,8 +64,9 @@ public URL — you'll paste it into the App form in the next step.
 > ⚠️ On the free ngrok plan the URL changes every session. After the
 > first registration, every subsequent dev session means: re-run this
 > script, then go to https://github.com/settings/apps/cdv-rabbit-bot-dev
-> → **Edit** and update **Webhook URL** + **Callback URL** with the new
-> ngrok URL. (Paid plan gives a stable subdomain and skips this step.)
+> → **Edit** and update **Homepage URL** + **Setup URL** + **Webhook
+> URL** with the new ngrok URL. (Paid plan gives a stable subdomain and
+> skips this step.)
 
 ## 2. Register the GitHub App (one-time)
 
@@ -76,8 +77,10 @@ Browse to https://github.com/settings/apps/new and fill in (substitute
 |---|---|
 | GitHub App name | `cdv-rabbit-bot-dev` |
 | Homepage URL | `https://abc-123.ngrok-free.app` |
-| **Setup URL** | `https://abc-123.ngrok-free.app/scm/github/install/callback` |
+| **Setup URL** (under "Post installation") | `https://abc-123.ngrok-free.app/scm/github/install/callback` |
+| **Redirect on update** (checkbox right under Setup URL) | ✅ **check it** — without this, GitHub completes the install but never redirects back, and the workspace stays disconnected with no error trail |
 | Callback URL | _(leave blank — we don't use the OAuth flow)_ |
+| Request user authorization (OAuth) during installation | _(leave unchecked — toggling this on routes the post-install redirect to **Callback URL** instead of **Setup URL** and breaks the contract)_ |
 | **Webhook URL** | `https://abc-123.ngrok-free.app/scm/github/webhook` |
 | **Webhook secret** | generate something random (e.g. `openssl rand -hex 32`) — **save it** |
 | Where can this GitHub App be installed? | **Only on this account** (it's a dev App for your `augusto-dmh` account only; "Any account" is for the eventual v0.3 self-service SaaS) |
@@ -431,6 +434,7 @@ Re-install to recover: repeat step 7.
 |---|---|---|
 | 401 on the webhook | `GITHUB_APP_WEBHOOK_SECRET` mismatch | Re-paste the secret from the App page into `.env`, `php artisan config:clear` |
 | 404 webhook | URL still pointing to old ngrok | Re-paste the new ngrok URL in the App's Webhook URL field |
+| Install on GitHub completes but browser stays on github.com (no redirect back, workspace stays disconnected, no error trail) | **Setup URL** field empty, OR **Redirect on update** unchecked, OR Setup URL points at a previous ngrok host | On `https://github.com/settings/apps/cdv-rabbit-bot-dev` → **Edit**: set Setup URL to `{APP_URL}/scm/github/install/callback`, tick **Redirect on update**, leave Callback URL blank and "Request user authorization (OAuth) during installation" off, **Save changes**. Then uninstall the orphan install on `https://github.com/settings/installations` and retry from the workspace's **Connect GitHub** page in a fresh tab (session marker has a 10-min TTL) |
 | Callback shows 403 | Session marker missing or already consumed (single-use; refreshing the Setup URL after a successful install retriggers this) | Click **Install on GitHub** again from the workspace page to re-stash the marker |
 | Callback shows 409 | This installation_id is already mapped to another Workspace row | Either reuse that workspace or uninstall + reinstall the App |
 | Review job fails on `getDiff` | App not granted access to DocInt | On github.com/settings/installations → **Configure** → grant repo access |
