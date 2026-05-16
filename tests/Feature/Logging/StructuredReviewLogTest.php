@@ -24,6 +24,7 @@ use Monolog\Handler\TestHandler;
 use Monolog\Level;
 use Monolog\LogRecord;
 use Tests\Fakes\FakeCostReservation;
+use Tests\Fakes\StubsV2LlmDriverMethods;
 
 // ---------------------------------------------------------------------------
 // Helpers (local to this file)
@@ -83,6 +84,8 @@ function logTestBindFakeLlm(?Closure $callback = null): void
 
     app()->bind(LlmDriverInterface::class, fn () => new class($cb) implements LlmDriverInterface
     {
+        use StubsV2LlmDriverMethods;
+
         public function __construct(private Closure $cb) {}
 
         public function getSystemPrompt(): string

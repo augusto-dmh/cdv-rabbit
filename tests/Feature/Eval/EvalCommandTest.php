@@ -9,11 +9,14 @@ use App\Services\Llm\Dto\ReviewResultDto;
 use App\Services\Llm\Dto\ReviewSummaryDto;
 use App\Services\Llm\LlmDriverInterface;
 use App\Services\Llm\OpenAiReviewer;
+use Tests\Fakes\StubsV2LlmDriverMethods;
 
 function makeFakeReviewer(ReviewResultDto $result): LlmDriverInterface
 {
     return new class($result) implements LlmDriverInterface
     {
+        use StubsV2LlmDriverMethods;
+
         public function __construct(private readonly ReviewResultDto $result) {}
 
         public function reviewDiff(string $systemPrompt, array $toolSchema, string $userMessage, array $options = []): ReviewResultDto

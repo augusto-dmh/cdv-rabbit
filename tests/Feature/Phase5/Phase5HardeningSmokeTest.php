@@ -26,6 +26,7 @@ use Monolog\Handler\TestHandler;
 use Monolog\Level;
 use Monolog\LogRecord;
 use Tests\Fakes\FakeCostReservation;
+use Tests\Fakes\StubsV2LlmDriverMethods;
 
 afterEach(function (): void {
     app(WorkspaceContext::class)->clear();
@@ -90,6 +91,8 @@ function phase5BindFakes(): void
 
     app()->bind(LlmDriverInterface::class, fn () => new class implements LlmDriverInterface
     {
+        use StubsV2LlmDriverMethods;
+
         public function getSystemPrompt(): string
         {
             return '';

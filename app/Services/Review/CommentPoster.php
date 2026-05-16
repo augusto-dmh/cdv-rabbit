@@ -7,7 +7,10 @@ namespace App\Services\Review;
 use App\Enums\CommentType;
 use App\Models\Review;
 use App\Models\ReviewComment;
+use App\Services\Llm\Dto\DraftReviewDto;
 use App\Services\Llm\Dto\ReviewCommentDto;
+use App\Services\Llm\Dto\ReviewFindingDto;
+use App\Services\Llm\Dto\ReviewNitpickDto;
 use App\Services\Llm\Dto\ReviewResultDto;
 use App\Services\Scm\Contracts\ScmDriverInterface;
 use App\Services\Scm\Dto\CommentHandle;
@@ -53,6 +56,34 @@ final class CommentPoster
         }
 
         $this->postSummary($review, $dto, $scmRepoId, $driver, overflowCount: $overflow);
+    }
+
+    /**
+     * v2 path — Walkthrough + tiered Findings inline + Nitpicks collapsed in <details>.
+     *
+     * AC46: only the supplied Findings reach inline comments (caller already filtered).
+     * AC48: Nitpicks are NEVER posted inline; they live in the <details> block of the summary.
+     * AC5  cap still applies to inline Findings.
+     */
+    public function postV2(
+        Review $review,
+        DraftReviewDto $draft,
+        string $scmRepoId,
+        ScmDriverInterface $driver,
+    ): void {
+        $findings = $draft->findings;
+
+        $overflow = 0;
+        if (count($findings) > self::MAX_INLINE_COMMENTS) {
+            $overflow = count($findings) - self::MAX_INLINE_COMMENTS;
+            $findings = array_slice($findings, 0, self::MAX_INLINE_COMMENTS);
+        }
+
+        foreach ($findings as $finding) {
+            $this->postInlineFinding($review, $finding, $scmRepoId, $driver);
+        }
+
+        $this->postV2Summary($review, $draft, $scmRepoId, $driver, overflowCount: $overflow);
     }
 
     private function postInlineComment(
@@ -106,6 +137,67 @@ final class CommentPoster
         ]);
     }
 
+    private function postInlineFinding(
+        Review $review,
+        ReviewFindingDto $finding,
+        string $scmRepoId,
+        ScmDriverInterface $driver,
+    ): void {
+        $body = sprintf(
+            '[%s] [%s] %s',
+            strtoupper($finding->severity),
+            strtoupper($finding->category),
+            $finding->message,
+        );
+
+        if ($finding->suggestion !== null && trim($finding->suggestion) !== '') {
+            $body .= "\n\n**Suggested fix:**\n".$finding->suggestion;
+        }
+
+        $rawMessage = self::AI_MARKER.' '.$this->sanitizer->sanitize($body);
+
+        $existing = ReviewComment::where('review_id', $review->id)
+            ->where('file_path', $finding->path)
+            ->where('line', $finding->line)
+            ->where('comment_type', CommentType::Inline)
+            ->whereNotNull('bitbucket_comment_id')
+            ->first();
+
+        if ($existing !== null) {
+            $driver->updateComment(
+                $scmRepoId,
+                $review->pull_request_number,
+                new CommentHandle(scmCommentId: (string) $existing->bitbucket_comment_id),
+                $rawMessage,
+            );
+
+            $existing->update(['posted_at' => now()]);
+
+            return;
+        }
+
+        $handle = $driver->postInlineComment(
+            $scmRepoId,
+            $review->pull_request_number,
+            new InlineCommentPayload(
+                body: $rawMessage,
+                path: $finding->path,
+                line: $finding->line,
+                headSha: (string) $review->head_sha,
+            ),
+        );
+
+        ReviewComment::create([
+            'review_id' => $review->id,
+            'workspace_id' => $review->workspace_id,
+            'file_path' => $finding->path,
+            'line' => $finding->line,
+            'bitbucket_comment_id' => $handle->scmCommentId,
+            'posted_at' => Carbon::now(),
+            'comment_type' => CommentType::Inline,
+        ]);
+    }
+
     private function postSummary(
         Review $review,
         ReviewResultDto $dto,
@@ -137,5 +229,78 @@ final class CommentPoster
             'posted_at' => Carbon::now(),
             'comment_type' => CommentType::Summary,
         ]);
+    }
+
+    private function postV2Summary(
+        Review $review,
+        DraftReviewDto $draft,
+        string $scmRepoId,
+        ScmDriverInterface $driver,
+        int $overflowCount,
+    ): void {
+        $walkthrough = $this->sanitizer->sanitize($draft->summary->walkthrough);
+        $overview = $this->sanitizer->sanitize($draft->summary->overview);
+        $riskLabel = strtoupper($draft->summary->riskLevel);
+
+        $high = $this->countSeverity($draft->findings, 'high');
+        $medium = $this->countSeverity($draft->findings, 'medium');
+        $low = $this->countSeverity($draft->findings, 'low');
+
+        $text = self::AI_MARKER." **Code Review Summary** (Risk: {$riskLabel})\n\n";
+        $text .= "## Walkthrough\n{$walkthrough}\n\n";
+        $text .= "{$overview}\n\n";
+        $text .= "## Findings (high: {$high}, medium: {$medium}, low: {$low})\n\n";
+
+        if ($overflowCount > 0) {
+            $text .= "_+{$overflowCount} more Findings were omitted due to the 25-comment cap. See individual file diffs for full details._\n\n";
+        }
+
+        $nitpickCount = count($draft->nitpicks);
+        if ($nitpickCount > 0) {
+            $text .= "<details>\n<summary>Nitpicks ({$nitpickCount})</summary>\n\n";
+            foreach ($draft->nitpicks as $nitpick) {
+                $line = $this->renderNitpickLine($nitpick);
+                $text .= "- {$line}\n";
+            }
+            $text .= "\n</details>\n";
+        }
+
+        $handle = $driver->postPullRequestComment(
+            $scmRepoId,
+            $review->pull_request_number,
+            $text,
+        );
+
+        ReviewComment::create([
+            'review_id' => $review->id,
+            'workspace_id' => $review->workspace_id,
+            'file_path' => null,
+            'line' => null,
+            'bitbucket_comment_id' => $handle->scmCommentId,
+            'posted_at' => Carbon::now(),
+            'comment_type' => CommentType::Summary,
+        ]);
+    }
+
+    /**
+     * @param  list<ReviewFindingDto>  $findings
+     */
+    private function countSeverity(array $findings, string $severity): int
+    {
+        $count = 0;
+        foreach ($findings as $finding) {
+            if ($finding->severity === $severity) {
+                $count++;
+            }
+        }
+
+        return $count;
+    }
+
+    private function renderNitpickLine(ReviewNitpickDto $nitpick): string
+    {
+        $message = $this->sanitizer->sanitize($nitpick->message);
+
+        return "`{$nitpick->path}:{$nitpick->line}` — {$message}";
     }
 }
