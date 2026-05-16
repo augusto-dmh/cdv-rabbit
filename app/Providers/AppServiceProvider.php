@@ -6,6 +6,9 @@ use App\Concerns\WorkspaceContext;
 use App\Models\Repository;
 use App\Models\Workspace;
 use App\Queue\RedactingFailedJobProvider;
+use App\Services\Eval\JudgeLlmCallerInterface;
+use App\Services\Eval\LaravelAiJudgeLlmCaller;
+use App\Services\Eval\LlmJudge;
 use App\Services\Llm\ClaudeReviewer;
 use App\Services\Llm\LlmDriverFactory;
 use App\Services\Llm\LlmDriverInterface;
@@ -32,6 +35,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(CostReservationInterface::class, CostReservation::class);
         $this->app->bind(LlmDriverInterface::class, ClaudeReviewer::class);
         $this->app->singleton(LlmDriverFactory::class);
+
+        $this->app->bind(JudgeLlmCallerInterface::class, LaravelAiJudgeLlmCaller::class);
+        $this->app->singleton(LlmJudge::class, fn ($app) => new LlmJudge(
+            caller: $app->make(JudgeLlmCallerInterface::class),
+            judgePromptPath: config_path('cdv-rabbit/prompts/eval_judge_v1.txt'),
+        ));
 
         $this->app->singleton(JwtSigner::class, fn ($app) => new JwtSigner(
             appId: (string) config('services.github.app_id', ''),
