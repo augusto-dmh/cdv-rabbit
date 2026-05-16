@@ -6,7 +6,7 @@
 > file describes the target; the git log describes the past;
 > this file bridges them.
 
-- **Last updated:** 2026-05-14 (MVP COMPLETE — tag `phase-5-complete` + `v0.1.0-mvp`)
+- **Last updated:** 2026-05-15 (Phase 6 planned — multi-SCM provider spec ratified)
 - **Test suite:** 329 tests, 1029 assertions, all green on tag `phase-5-complete`
 - **Repo:** https://github.com/augusto-dmh/cdv-rabbit (private)
 - **Branch:** `main` only (trunk-based, no PR workflow yet)
@@ -84,6 +84,12 @@ The plan runs 5 phases over 4–6 weeks:
 - W6 buffer / pilot — operational gate (DPO sign-off, Anthropic budget, BB service account, prod infra)
 
 🎉 **MVP CODE COMPLETE.** All 5 phases shipped, all 26 acceptance criteria covered, 329/1029 tests green. Remaining items before GA are operational sign-offs listed in plan §12.
+
+### Phase 6 (planned) — Multi-SCM Provider Support
+
+cdv-rabbit gains GitHub Cloud as a second SCM Provider alongside Bitbucket Cloud. Provider is chosen per Workspace at creation and immutable thereafter via `workspaces.scm_provider` enum. Both providers implement `ScmDriverInterface` (flat wide surface, normalized DTOs) and are resolved via `ScmDriverFactory::make(Workspace)`, mirroring the `LlmDriverFactory` precedent. GitHub auth is via GitHub App (not PAT) with per-Workspace `github_installation_id`. Webhook controllers are split per provider; the HMAC scheme becomes asymmetric (per-Workspace for BB, per-App for GH). Source of truth: `specs/multi-scm-provider-support.md`. Design decisions: `docs/adr/0001-strict-1-to-1-workspace-and-scm-owner.md` through `docs/adr/0004-scm-driver-interface-shape.md`. Glossary: `CONTEXT.md`. New ACs: AC27..AC38.
+
+**Implementation gated on**: §7 operational sign-offs + GitHub App "cdv-rabbit-bot" registration + GitHub DPA. No code changes yet — spec + ADRs + glossary only.
 
 ### W1 task graph + status (all complete)
 
@@ -200,7 +206,7 @@ rationale lives in plan §3.0.
 | **Failed-job redaction** | `RedactingFailedJobProvider` strips keys in `[diff, patch, content, body, hunk, code, source]` from `failed_jobs.payload` before persistence. | Closes the v1.0 B1 BLOCKER |
 | **Prompt caching on every Claude call** | `cache_control: { type: "ephemeral" }` on last tool def + last system block. System prompt + tool schema are frozen artifacts. Cache hit recorded as `cache_read_input_tokens` in `reviews_llm_calls`. | 90% read discount; ITPM bypass (plan §3.0.2) |
 | **Strict tool use** | Anthropic `tool_choice: { type: "tool", name: "review_result" }` with `strict: true` and `additionalProperties: false`. Grammar-constrained sampling, no validation retries. | Schema conformance (plan §3.0.3, AC23) |
-| **HMAC webhook auth** | Primary auth is `X-Hub-Signature` HMAC-SHA256 verification with `hash_equals`. URL token is defense-in-depth only. | Plan §3.0 + AC19 |
+| **HMAC webhook auth (per-provider, asymmetric)** | Bitbucket: primary auth is `X-Hub-Signature` HMAC-SHA256 with `hash_equals` against the per-Workspace `webhook_secret`; URL token (`repositories.webhook_token`) is defense-in-depth. GitHub: primary auth is `X-Hub-Signature-256` HMAC-SHA256 against the per-App `GITHUB_APP_WEBHOOK_SECRET` env value; no URL token. Both controllers reject missing/mismatched signatures with 401 before any DB write or dispatch. | Plan §3.0 + AC19 + AC33 + AC34 + ADR 0003 |
 | **Atomic cost ceiling** | Per-workspace daily token ceiling enforced via Redis Lua `INCRBY`. No TOCTOU race. | Closes v1.0 M1 |
 | **Comment cap + AI label** | Max 25 inline comments per PR, every comment prefixed `🤖 cdv-rabbit (AI generated):`. Kill switch can halt dispatch within 10 s (AC8). | Plan §3 Week 3 + AC5/AC6/AC8 |
 
@@ -272,7 +278,9 @@ items (plan §11):
 - Slack/Teams/Discord notifications — v0.2.
 - External tool orchestration (Semgrep, Gitleaks, ESLint) — v0.2.
 - Bitbucket Data Center — v1.0+.
-- GitHub / GitLab driver — v1.0+.
+- GitHub Cloud driver — **promoted to Phase 6** (planned); see `specs/multi-scm-provider-support.md` and ADRs `docs/adr/0001..0004.md`.
+- GitLab driver — v1.1+.
+- GitHub Enterprise Server / Bitbucket Data Center drivers — v1.1+.
 - IDE companion — v1.0+.
 - Autofix (commit patches back) — v1.0+.
 - Sequence diagram generation — v1.0+.
