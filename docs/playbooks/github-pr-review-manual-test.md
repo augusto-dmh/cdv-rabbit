@@ -310,22 +310,7 @@ You should now see the workspace with `health=healthy`.
 
 ---
 
-## 8. Workaround — set the SCM owner slug
-
-The `Show.vue` "Sync repositories" button is gated on `scm_owner_slug`.
-For a Bitbucket workspace, this gets populated by the connect wizard.
-For GitHub, the install callback doesn't currently populate it. Patch
-it manually for now:
-
-```bash
-php artisan tinker --execute 'App\Models\Workspace::where("slug", "docint")->update(["scm_owner_slug" => "augusto-dmh"]);'
-```
-
-Reload `/workspaces/docint`. The **Sync repositories** button is now visible.
-
----
-
-## 9. Sync + enable the DocInt repo
+## 8. Sync + enable the DocInt repo
 
 1. Click **Sync repositories**. Behind the scenes:
    `GithubDriver::listRepositories()` calls `GET /installation/repositories`,
@@ -344,7 +329,7 @@ php artisan tinker --execute '\App\Models\Repository::where("full_name", "august
 
 ---
 
-## 10. Open a PR on DocInt
+## 9. Open a PR on DocInt
 
 On https://github.com/augusto-dmh/DocInt:
 
@@ -378,7 +363,7 @@ Horizon picks it up; the job:
 
 ---
 
-## 11. Verify
+## 10. Verify
 
 **On the PR page** — you should see a comment from `cdv-rabbit-bot-dev[bot]`
 starting with `🤖 cdv-rabbit (AI generated):` within ~30-60s of opening
@@ -414,7 +399,7 @@ Expected:
 
 ---
 
-## 12. Test the uninstall path (AC36)
+## 11. Test the uninstall path (AC36)
 
 On https://github.com/settings/installations → find `cdv-rabbit-bot-dev`
 → **Uninstall**. GitHub fires `installation.action=deleted` to your
