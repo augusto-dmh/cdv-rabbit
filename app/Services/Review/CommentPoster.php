@@ -16,6 +16,7 @@ use App\Services\Scm\Contracts\ScmDriverInterface;
 use App\Services\Scm\Dto\CommentHandle;
 use App\Services\Scm\Dto\InlineCommentPayload;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 final class CommentPoster
 {
@@ -79,11 +80,47 @@ final class CommentPoster
             $findings = array_slice($findings, 0, self::MAX_INLINE_COMMENTS);
         }
 
+        $unresolved = [];
         foreach ($findings as $finding) {
-            $this->postInlineFinding($review, $finding, $scmRepoId, $driver);
+            if (! $this->tryPostInlineFinding($review, $finding, $scmRepoId, $driver)) {
+                $unresolved[] = $finding;
+            }
         }
 
-        $this->postV2Summary($review, $draft, $scmRepoId, $driver, overflowCount: $overflow);
+        $this->postV2Summary($review, $draft, $scmRepoId, $driver, overflowCount: $overflow, unresolved: $unresolved);
+    }
+
+    /**
+     * Try to post an inline Finding. Returns true on success, false when the SCM
+     * rejects the (path, line) — typical when the LLM emits an off-by-a-few line
+     * that doesn't anchor to a real `+` line on the head commit (e.g. blank
+     * lines, lines outside the diff hunk). Caller folds rejected Findings into
+     * the summary body via postV2Summary so they still reach the PR.
+     */
+    private function tryPostInlineFinding(
+        Review $review,
+        ReviewFindingDto $finding,
+        string $scmRepoId,
+        ScmDriverInterface $driver,
+    ): bool {
+        try {
+            $this->postInlineFinding($review, $finding, $scmRepoId, $driver);
+
+            return true;
+        } catch (\RuntimeException $e) {
+            // SCM driver throws RuntimeException with the upstream payload on 422
+            // ("path could not be resolved"). Surface to the structured log and
+            // fall back to the summary body — never silence the Finding.
+            Log::warning('CommentPoster: inline post fell back to summary', [
+                'review_id' => $review->id,
+                'path' => $finding->path,
+                'line' => $finding->line,
+                'severity' => $finding->severity,
+                'scm_error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
     private function postInlineComment(
@@ -231,12 +268,16 @@ final class CommentPoster
         ]);
     }
 
+    /**
+     * @param  list<ReviewFindingDto>  $unresolved
+     */
     private function postV2Summary(
         Review $review,
         DraftReviewDto $draft,
         string $scmRepoId,
         ScmDriverInterface $driver,
         int $overflowCount,
+        array $unresolved = [],
     ): void {
         $walkthrough = $this->sanitizer->sanitize($draft->summary->walkthrough);
         $overview = $this->sanitizer->sanitize($draft->summary->overview);
@@ -253,6 +294,17 @@ final class CommentPoster
 
         if ($overflowCount > 0) {
             $text .= "_+{$overflowCount} more Findings were omitted due to the 25-comment cap. See individual file diffs for full details._\n\n";
+        }
+
+        if (count($unresolved) > 0) {
+            $text .= "<details>\n<summary>Unresolved Findings (".count($unresolved).") — couldn't anchor inline; reported here</summary>\n\n";
+            foreach ($unresolved as $finding) {
+                $sev = strtoupper($finding->severity);
+                $cat = strtoupper($finding->category);
+                $msg = $this->sanitizer->sanitize($finding->message);
+                $text .= "- `{$finding->path}:{$finding->line}` — [{$sev}] [{$cat}] {$msg}\n";
+            }
+            $text .= "\n</details>\n\n";
         }
 
         $nitpickCount = count($draft->nitpicks);
