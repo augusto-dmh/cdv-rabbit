@@ -11,6 +11,8 @@ use App\Services\Llm\LlmDriverFactory;
 use App\Services\Llm\LlmDriverInterface;
 use App\Services\Review\CostReservation;
 use App\Services\Review\CostReservationInterface;
+use App\Services\Scm\Github\InstallationTokenCache;
+use App\Services\Scm\Github\JwtSigner;
 use Carbon\CarbonImmutable;
 use Illuminate\Queue\Failed\DatabaseUuidFailedJobProvider;
 use Illuminate\Support\Facades\Date;
@@ -30,6 +32,16 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(CostReservationInterface::class, CostReservation::class);
         $this->app->bind(LlmDriverInterface::class, ClaudeReviewer::class);
         $this->app->singleton(LlmDriverFactory::class);
+
+        $this->app->singleton(JwtSigner::class, fn ($app) => new JwtSigner(
+            appId: (string) config('services.github.app_id', ''),
+            privateKey: (string) config('services.github.app_private_key', ''),
+        ));
+
+        $this->app->singleton(InstallationTokenCache::class, fn ($app) => new InstallationTokenCache(
+            signer: $app->make(JwtSigner::class),
+            baseUrl: rtrim((string) config('services.github.base_url', 'https://api.github.com'), '/'),
+        ));
     }
 
     // QueueServiceProvider is deferred — it registers queue.failer lazily. Using extend()

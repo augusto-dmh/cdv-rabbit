@@ -40,4 +40,12 @@ return [
         'webhook_base_url' => env('BITBUCKET_WEBHOOK_BASE_URL', env('APP_URL').'/bb/webhook'),
     ],
 
+    'github' => [
+        'base_url' => env('GITHUB_BASE_URL', 'https://api.github.com'),
+        'app_id' => env('GITHUB_APP_ID'),
+        'app_slug' => env('GITHUB_APP_SLUG'),
+        'app_private_key' => env('GITHUB_APP_PRIVATE_KEY'),
+        'app_webhook_secret' => env('GITHUB_APP_WEBHOOK_SECRET'),
+    ],
+
 ];
