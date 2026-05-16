@@ -22,6 +22,7 @@ class CreateWorkspaceRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['required', 'string', 'regex:/^[a-z0-9-]+$/', 'unique:workspaces,slug'],
+            'scm_provider' => ['required', 'in:bitbucket_cloud,github_cloud'],
         ];
     }
 }

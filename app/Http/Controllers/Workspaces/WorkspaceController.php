@@ -92,6 +92,8 @@ class WorkspaceController extends Controller
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'llm_provider' => ['sometimes', 'in:anthropic,openai'],
+            // AC28: scm_provider is immutable after Workspace creation. Rejected with 422 when sent.
+            'scm_provider' => ['prohibited'],
         ]);
 
         $workspace->update($validated);

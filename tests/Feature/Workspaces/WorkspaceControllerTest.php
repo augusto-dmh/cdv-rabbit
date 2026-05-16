@@ -30,6 +30,7 @@ test('store creates workspace and auto-attaches owner as admin', function (): vo
         ->post(route('workspaces.store'), [
             'name' => 'Acme Corp',
             'slug' => 'acme-corp',
+            'scm_provider' => 'bitbucket_cloud',
         ])
         ->assertRedirect(route('workspaces.show', 'acme-corp'));
 
@@ -49,6 +50,7 @@ test('store rejects duplicate slug', function (): void {
         ->post(route('workspaces.store'), [
             'name' => 'Another',
             'slug' => 'taken-slug',
+            'scm_provider' => 'bitbucket_cloud',
         ])
         ->assertSessionHasErrors('slug');
 });
@@ -58,6 +60,7 @@ test('store rejects invalid slug format', function (): void {
         ->post(route('workspaces.store'), [
             'name' => 'Bad Slug',
             'slug' => 'Bad Slug!',
+            'scm_provider' => 'bitbucket_cloud',
         ])
         ->assertSessionHasErrors('slug');
 });
