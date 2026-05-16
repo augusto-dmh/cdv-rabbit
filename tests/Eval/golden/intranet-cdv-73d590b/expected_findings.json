@@ -1,0 +1,53 @@
+{
+  "fixture_id": "intranet-cdv-73d590b",
+  "pr_summary": "Allocation dashboard change: FGC (Bancários) and Crédito Privado approved-issuer tables now always sum across every account the client holds, ignoring the AccountSelector. Reason: FGC concentration limits apply per-CPF (R$ 250k per institution, R$ 1M overall) and private-credit issuer concentration is also a CPF-level concern, so the previous behaviour (% PL of the selected wallet) misrepresented true regulatory exposure. useAllocationDashboard.ts gains `allEffectivePositions`, `consolidatedRfPositions`, `consolidatedTotalEquity`. AllocationDashboard passes both selection-scoped and consolidated pairs to RFAllocation, which routes the consolidated pair to RFBancariosCP → RFBancariosTable + RFCreditoPrivadoTable. Two table subtitles spell out the consolidation. Docs updated. 7 files / +91 / -25.",
+  "expected_findings": [
+    {
+      "path": "src/resources/js/Features/Client/Allocation/Components/RFAllocation.vue",
+      "line_range": [29, 38],
+      "severity": "medium",
+      "category": "bug",
+      "rationale": "issuerExposurePositions falls back to props.rfPositions when consolidatedRfPositions is absent: `props.consolidatedRfPositions ?? props.rfPositions`. The whole point of the PR is that the FGC/CrédPriv tables MUST be consolidated to reflect CPF-level concentration — silently degrading to selection-scoped data when a caller forgets to pass the new prop reintroduces exactly the regulatory-misrepresentation bug the PR is fixing. Prefer making the consolidated props required (drop `?:` in defineProps, remove the fallback) so any caller that doesn't migrate fails loudly at type-check time rather than silently returning wrong percentages.",
+      "must_find": true
+    },
+    {
+      "path": "src/resources/js/Features/Client/Allocation/Composables/useAllocationDashboard.ts",
+      "line_range": [62, 78],
+      "severity": "low",
+      "category": "perf",
+      "rationale": "`effectivePositions` is now derived as `allEffectivePositions.filter(p => selectedAccountIds.includes(p.accountId))`. `Array.prototype.includes` over `selectedAccountIds` (an array) is O(n) per position — the previous form was the same complexity but did one filter+map pass. The refactor swaps it to filter→map→filter (allManagedPositions = positions.map; allEffectivePositions = allManagedPositions.filter; effectivePositions = allEffectivePositions.filter), which evaluates the override+exclude logic on the whole superset before discarding the un-selected portion. For accounts with hundreds of positions across many wallets and only one wallet selected, this is wasted work on every Vue tick. If positions are large, convert selectedAccountIds to a Set inside effectivePositions and reorder the pipeline.",
+      "must_find": false
+    },
+    {
+      "path": "src/resources/js/Features/Client/Allocation/Composables/useAllocationDashboard.ts",
+      "line_range": [83, 90],
+      "severity": "medium",
+      "category": "bug",
+      "rationale": "`consolidatedTotalEquity` sums `allEffectivePositions` plus `accounts.value.reduce((sum, a) => sum + a.cash, 0)` — every account's cash, not just selected accounts. That is consistent with 'consolidated', so it's correct. BUT: the % PL column in RFBancariosTable / RFCreditoPrivadoTable now uses `consolidatedTotalEquity` as the denominator while their % values per row are RF-only consolidated positions. If the client has significant *non-RF* holdings (RV-heavy portfolio), the % PL the advisor sees is intentionally diluted — which is the correct interpretation only if the table is meant to show 'this issuer is X% of the client's NET WORTH'. Reviewer should verify with the product owner / regulatory note that 'X% PL' on the FGC table actually means total-equity-denominator (not RF-equity-denominator). If it's supposed to be 'X% of RF holdings', the denominator is wrong.",
+      "must_find": true
+    },
+    {
+      "path": "src/resources/js/Features/Client/Allocation/Components/AllocationDashboard.vue",
+      "line_range": [163, 174],
+      "severity": "low",
+      "category": "maintainability",
+      "rationale": "AllocationDashboard now passes both (rfPositions, totalEquity) and (consolidatedRfPositions, consolidatedTotalEquity) to RFAllocation. Four props where there used to be two, with the relationship between them encoded in prose docs. Consider a single object prop `:rf-data=\"{ selection: {...}, consolidated: {...} }\"` so the contract between dashboard and RFAllocation is structurally enforced — preventing the partial-migration class of bug where a future caller sets the selection-scoped pair but forgets the consolidated pair.",
+      "must_find": false
+    },
+    {
+      "path": "src/resources/js/Features/Client/Allocation/Components/rf/RFBancariosTable.vue",
+      "line_range": [165, 167],
+      "severity": "low",
+      "category": "maintainability",
+      "rationale": "The subtitle 'Exposição consolidada: soma todas as carteiras do cliente' was added to RFBancariosTable and RFCreditoPrivadoTable. Good UX call (regression-proofs the visual). But the subtitle is a duplicated string literal across the two files — extract to a shared constant in Allocation/Types or a util so future copy edits touch one place. Translation/i18n surface should also be considered if the project uses vue-i18n elsewhere.",
+      "must_find": false
+    }
+  ],
+  "expected_walkthrough_mentions": [
+    "FGC + Crédito Privado tables now always consolidated across every account",
+    "regulatory concentration limits apply per-CPF, not per-wallet",
+    "new computeds: allEffectivePositions, consolidatedRfPositions, consolidatedTotalEquity",
+    "RFAllocation accepts both selection-scoped and consolidated prop pairs",
+    "subtitle copy on each table makes consolidation explicit"
+  ]
+}

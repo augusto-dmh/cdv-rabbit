@@ -1,0 +1,270 @@
+diff --git a/docs/modules/allocation.md b/docs/modules/allocation.md
+index 6f692d10d..6a673c055 100644
+--- a/docs/modules/allocation.md
++++ b/docs/modules/allocation.md
+@@ -53,7 +53,7 @@ #### RF Sub-components (`Components/rf/`)
+ | File | Role |
+ |---|---|
+ | `RFApprovedProducts.vue` | Container for approved fixed income offerings |
+-| `RFBancariosCP.vue` | Bancários and Crédito Privado approved issuer panels |
++| `RFBancariosCP.vue` | Bancários and Crédito Privado approved issuer panels (always consolidated across every wallet — see "Consolidated Issuer Exposure" below) |
+ | `RFBancariosTable.vue` | Approved bank issuer table with risk ratings |
+ | `RFCreditoPrivadoTable.vue` | Approved private credit issuer table |
+ | `RFYearLadder.vue` | Fixed income maturity ladder builder |
+@@ -175,14 +175,17 @@ ## Frontend Data Flow
+            │     ├── buildAccounts() → Account[]
+            │     ├── buildPositions() → PositionItem[]
+            │     ├── selectedAccountIds (reactive)
+-           │     ├── effectivePositions (computed: filtered + strategy overrides)
++           │     ├── allEffectivePositions (computed: every account, overrides + exclusions)
++           │     ├── effectivePositions (computed: allEffectivePositions ∩ selectedAccountIds)
+            │     ├── macroAllocation (computed: strategy totals + percentages)
+-           │     ├── rfPositions / rvPositions (computed: by asset type)
+-           │     └── totalEquity (computed: positions total + cash)
++           │     ├── rfPositions / rvPositions (computed: by asset type, scoped to selection)
++           │     ├── consolidatedRfPositions (computed: every account, RF only)
++           │     ├── totalEquity (computed: selection positions + selection cash)
++           │     └── consolidatedTotalEquity (computed: every position + every cash)
+            │
+            ├── AccountSelector ← toggleAccount()
+            ├── MacroAllocationChart ← macroAllocation, contribution simulation
+-           ├── RFAllocation ← rfPositions, products, approvedIssuers
++           ├── RFAllocation ← rfPositions + consolidatedRfPositions, products, approvedIssuers
+            └── RVBasket ← rvPositions, rankings, simulation data
+                  │
+                  ├── useRVAllocation() → finalAllocationMap, totalBuys, totalSells
+@@ -206,6 +209,24 @@ ### Asset Exclusion
+ 
+ Individual assets can be excluded from calculations via `excludedAssetIds`. Excluded assets are filtered out of `effectivePositions`.
+ 
++### Consolidated Issuer Exposure (FGC / Crédito Privado)
++
++The Bancários (FGC) and Crédito Privado tables under [RFBancariosCP.vue](../../src/resources/js/Features/Client/Allocation/Components/rf/RFBancariosCP.vue) intentionally **ignore** `AccountSelector`. Concentration limits in those instruments apply to the investor's CPF, not to a single broker — FGC caps at R$ 250k per institution per CPF (R$ 1M overall), and private credit issuer concentration is also tracked across all wallets.
++
++To support this, `useAllocationDashboard` exposes two parallel computeds that operate over every account regardless of selection:
++
++| Selection-scoped | Consolidated equivalent |
++|---|---|
++| `effectivePositions` | `allEffectivePositions` |
++| `rfPositions` | `consolidatedRfPositions` |
++| `totalEquity` | `consolidatedTotalEquity` |
++
++Both consolidated computeds still apply `strategyOverrides` and `excludedAssetIds` (advisor configuration is honored), but they skip the `selectedAccountIds` filter.
++
++`AllocationDashboard` passes both pairs into `RFAllocation`. `RFAllocation` routes the selection-scoped data to the maturity ladder, RF aporte summary, and approved-products section, and the consolidated pair to `RFBancariosCP` — which then feeds both `RFBancariosTable` (FGC) and `RFCreditoPrivadoTable`. The `% PL` column in those two tables is therefore calculated against `consolidatedTotalEquity`, so the percentages reflect the client's true concentration.
++
++A subtitle on each of the two tables makes the consolidation explicit so advisors don't mistake stale numbers for a broken filter.
++
+ ---
+ 
+ ## Equity Allocation Engine
+@@ -536,4 +557,5 @@ ## Sensitive Areas
+ - The `AssetService` caches rankings and fixed income offers for 1 hour. Approved issuers are cached for 1 day. Stale data is possible within those windows.
+ - Treasury strategy mapping relies on code prefix matching. New treasury instrument types would need manual addition to `TREASURY_STRATEGY_MAP`.
+ - The equity allocation engine's full lot rounding and leftover redistribution are purely client-side computations — no backend validation exists for the generated orders.
++- The Bancários (FGC) and Crédito Privado tables in [RFBancariosCP.vue](../../src/resources/js/Features/Client/Allocation/Components/rf/RFBancariosCP.vue) deliberately ignore `AccountSelector` to surface CPF-level concentration. Anyone changing the RF data pipeline must keep `consolidatedRfPositions` / `consolidatedTotalEquity` flowing through that component, or the percentages will silently shift to a selection-scoped view and misrepresent regulatory exposure.
+ - Frontend changes in this module should stay within `Features/Client/Allocation/` and follow Shadcn as the target UI standard.
+diff --git a/src/resources/js/Features/Client/Allocation/Components/AllocationDashboard.vue b/src/resources/js/Features/Client/Allocation/Components/AllocationDashboard.vue
+index 7fbb3c6f1..f1351e793 100644
+--- a/src/resources/js/Features/Client/Allocation/Components/AllocationDashboard.vue
++++ b/src/resources/js/Features/Client/Allocation/Components/AllocationDashboard.vue
+@@ -163,7 +163,9 @@
+       <RFAllocation
+         v-if="mainCategory === 'RF'"
+         :rf-positions="dashboard.rfPositions.value"
++        :consolidated-rf-positions="dashboard.consolidatedRfPositions.value"
+         :total-equity="dashboard.totalEquity.value"
++        :consolidated-total-equity="dashboard.consolidatedTotalEquity.value"
+         :products="props.data.products"
+         :approved-issuers="props.data.approvedIssuers"
+         :simulation-data="simulationData"
+diff --git a/src/resources/js/Features/Client/Allocation/Components/RFAllocation.vue b/src/resources/js/Features/Client/Allocation/Components/RFAllocation.vue
+index 52c5ca311..c134b9367 100644
+--- a/src/resources/js/Features/Client/Allocation/Components/RFAllocation.vue
++++ b/src/resources/js/Features/Client/Allocation/Components/RFAllocation.vue
+@@ -20,13 +20,27 @@
+ 
+   const props = defineProps<{
+     rfPositions: PositionItem[];
++    consolidatedRfPositions?: PositionItem[];
+     totalEquity: number;
++    consolidatedTotalEquity?: number;
+     products?: ProductsData;
+     approvedIssuers?: ApprovedIssuersData;
+     simulationData?: SimulationData;
+     selectedAccounts?: Account[];
+   }>();
+ 
++  // Issuer-exposure tables (Bancários/FGC + Crédito Privado) are always
++  // computed against every account so the CPF view matches regulatory
++  // concentration limits, regardless of which wallets the advisor is viewing.
++  // Falls back to the selection-scoped data when consolidated props are absent
++  // (older callers / tests).
++  const issuerExposurePositions = computed(
++    () => props.consolidatedRfPositions ?? props.rfPositions
++  );
++  const issuerExposureTotalEquity = computed(
++    () => props.consolidatedTotalEquity ?? props.totalEquity
++  );
++
+   interface RFAporteEntry {
+     account: Account;
+     strategies: Array<{ name: string; amount: number; color: string }>;
+@@ -156,8 +170,8 @@
+       @update:ladder-summary="(v) => (ladderSummary = v)"
+     />
+     <RFBancariosCP
+-      :rf-positions="rfPositions"
+-      :total-equity="totalEquity"
++      :consolidated-rf-positions="issuerExposurePositions"
++      :consolidated-total-equity="issuerExposureTotalEquity"
+       :products="products"
+       :approved-issuers="approvedIssuers"
+     />
+diff --git a/src/resources/js/Features/Client/Allocation/Components/rf/RFBancariosCP.vue b/src/resources/js/Features/Client/Allocation/Components/rf/RFBancariosCP.vue
+index 5a4a81ca6..f97087803 100644
+--- a/src/resources/js/Features/Client/Allocation/Components/rf/RFBancariosCP.vue
++++ b/src/resources/js/Features/Client/Allocation/Components/rf/RFBancariosCP.vue
+@@ -8,8 +8,8 @@
+   } from "@/Features/Client/Allocation/Types";
+ 
+   const props = defineProps<{
+-    rfPositions: PositionItem[];
+-    totalEquity: number;
++    consolidatedRfPositions: PositionItem[];
++    consolidatedTotalEquity: number;
+     products?: ProductsData;
+     approvedIssuers?: ApprovedIssuersData;
+   }>();
+@@ -18,15 +18,15 @@
+ <template>
+   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+     <RFBancariosTable
+-      :rf-positions="props.rfPositions"
+-      :total-equity="props.totalEquity"
++      :rf-positions="props.consolidatedRfPositions"
++      :total-equity="props.consolidatedTotalEquity"
+       :bancarios-xp="props.products?.bancariosXp"
+       :bancarios-btg="props.products?.bancariosBtg"
+       :approved-bancarios="props.approvedIssuers?.bancarios"
+     />
+     <RFCreditoPrivadoTable
+-      :rf-positions="props.rfPositions"
+-      :total-equity="props.totalEquity"
++      :rf-positions="props.consolidatedRfPositions"
++      :total-equity="props.consolidatedTotalEquity"
+       :credito-privado-xp="props.products?.creditoPrivadoXp"
+       :credito-privado-btg="props.products?.creditoPrivadoBtg"
+       :approved-credito-privado="props.approvedIssuers?.creditoPrivado"
+diff --git a/src/resources/js/Features/Client/Allocation/Components/rf/RFBancariosTable.vue b/src/resources/js/Features/Client/Allocation/Components/rf/RFBancariosTable.vue
+index 0b6a41fae..824e7266e 100644
+--- a/src/resources/js/Features/Client/Allocation/Components/rf/RFBancariosTable.vue
++++ b/src/resources/js/Features/Client/Allocation/Components/rf/RFBancariosTable.vue
+@@ -162,8 +162,9 @@
+       <p
+         class="text-[10px] text-slate-600 dark:text-slate-400 font-medium leading-snug"
+       >
+-        Ratings e estratégias fornecidos pelo time de Estratégias. Posições são
+-        agregadas por conglomerado financeiro.
++        Ratings e estratégias fornecidos pelo time de Estratégias. Exposição
++        consolidada: soma todas as carteiras do cliente, independentemente da
++        seleção de visualização.
+       </p>
+       <!-- Legend -->
+       <div class="flex items-center gap-3 pt-1">
+diff --git a/src/resources/js/Features/Client/Allocation/Components/rf/RFCreditoPrivadoTable.vue b/src/resources/js/Features/Client/Allocation/Components/rf/RFCreditoPrivadoTable.vue
+index 385a5ffee..715f4e2d1 100644
+--- a/src/resources/js/Features/Client/Allocation/Components/rf/RFCreditoPrivadoTable.vue
++++ b/src/resources/js/Features/Client/Allocation/Components/rf/RFCreditoPrivadoTable.vue
+@@ -206,7 +206,9 @@
+       <p
+         class="text-[10px] text-slate-600 dark:text-slate-400 font-medium leading-snug"
+       >
+-        Ratings e estratégias fornecidos pelo time de Estratégias.
++        Ratings e estratégias fornecidos pelo time de Estratégias. Exposição
++        consolidada: soma todas as carteiras do cliente, independentemente da
++        seleção de visualização.
+       </p>
+     </div>
+ 
+diff --git a/src/resources/js/Features/Client/Allocation/Composables/useAllocationDashboard.ts b/src/resources/js/Features/Client/Allocation/Composables/useAllocationDashboard.ts
+index 87d3f9a97..ed3451e66 100644
+--- a/src/resources/js/Features/Client/Allocation/Composables/useAllocationDashboard.ts
++++ b/src/resources/js/Features/Client/Allocation/Composables/useAllocationDashboard.ts
+@@ -50,19 +50,27 @@ export const useAllocationDashboard = (props: ClientAllocationPageProps) => {
+     )
+   );
+ 
++  const allManagedPositions = computed(() =>
++    positions.value.map((position) =>
++      applyStrategyOverride(position, strategyOverrides.value)
++    )
++  );
++
++  const allEffectivePositions = computed(() =>
++    allManagedPositions.value.filter(
++      (position) => !excludedAssetIds.value.has(buildAssetKey(position))
++    )
++  );
++
+   const managedPositions = computed(() =>
+-    positions.value
+-      .filter((position) =>
+-        selectedAccountIds.value.includes(position.accountId)
+-      )
+-      .map((position) =>
+-        applyStrategyOverride(position, strategyOverrides.value)
+-      )
++    allManagedPositions.value.filter((position) =>
++      selectedAccountIds.value.includes(position.accountId)
++    )
+   );
+ 
+   const effectivePositions = computed(() =>
+-    managedPositions.value.filter(
+-      (position) => !excludedAssetIds.value.has(buildAssetKey(position))
++    allEffectivePositions.value.filter((position) =>
++      selectedAccountIds.value.includes(position.accountId)
+     )
+   );
+ 
+@@ -72,6 +80,15 @@ export const useAllocationDashboard = (props: ClientAllocationPageProps) => {
+       selectedAccounts.value.reduce((sum, account) => sum + account.cash, 0)
+   );
+ 
++  // Consolidated across every account, ignoring `selectedAccountIds`.
++  // Used by views where FGC exposure must reflect the client's full CPF
++  // position, not the currently selected wallets.
++  const consolidatedTotalEquity = computed(
++    () =>
++      allEffectivePositions.value.reduce((sum, item) => sum + item.total, 0) +
++      accounts.value.reduce((sum, account) => sum + account.cash, 0)
++  );
++
+   const macroAllocation = computed(() => {
+     const totals = effectivePositions.value.reduce<Record<string, number>>(
+       (acc, item) => {
+@@ -102,6 +119,12 @@ export const useAllocationDashboard = (props: ClientAllocationPageProps) => {
+     )
+   );
+ 
++  const consolidatedRfPositions = computed(() =>
++    sortByValue(
++      allEffectivePositions.value.filter((item) => item.assetType === "RF")
++    )
++  );
++
+   const rvPositions = computed(() =>
+     sortByValue(
+       effectivePositions.value.filter((item) => item.assetType !== "RF")
+@@ -184,8 +207,10 @@ export const useAllocationDashboard = (props: ClientAllocationPageProps) => {
+     effectivePositions,
+     managedPositions,
+     totalEquity,
++    consolidatedTotalEquity,
+     macroAllocation,
+     rfPositions,
++    consolidatedRfPositions,
+     rvPositions,
+     rvByClass,
+     rvCurrentClassAssets,

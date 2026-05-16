@@ -10,9 +10,9 @@ This playbook is the protocol for adding a new fixture without my help. Follow e
 
 | Source repo | Quota | Currently seeded | Notes |
 |---|---|---|---|
-| `augusto-dmh/DocInt` | 5 | 3 (PR #35, PR #31, PR #28) | The primary review consumer; rich Laravel surface; high signal. |
-| `augusto-dmh/cdv-rabbit` (this repo) | 3 | 0 | Self-eval: dogfood the reviewer on its own history. |
-| `augusto-dmh/intranet-cdv` | 2 | 0 | Diversity across a larger / older codebase. |
+| `augusto-dmh/DocInt` | 5 | 5 (PR #35, PR #31, PR #28, PR #29, PR #30) | The primary review consumer; rich Laravel surface; high signal. |
+| `augusto-dmh/cdv-rabbit` (this repo) | 3 | 3 (1dec69a, 19d2df8, 1630399) | Self-eval: dogfood the reviewer on its own history. |
+| `augusto-dmh/intranet-cdv` | 2 | 2 (19159e4, 73d590b) | Diversity across a larger / older codebase. |
 
 Diversity is more important than count. A corpus of 10 PRs that are all controller-slim refactors gives less signal than 5 PRs covering: a controller refactor, a migration, a fix, a feature, and a security-sensitive change.
 
@@ -129,12 +129,25 @@ Field semantics:
 
 ## Roadmap
 
-Current seed (3 of 10):
+Current seed (10 of 10):
+
+DocInt (5):
 - `docint-pr-35` — refactor: extract dashboard aggregations + cross-tenant guard trait (8 files, 233/-110). 4 expected Findings covering trait abort-code info-leak, aggregator N+1 risk, enum back-compat, three-orthogonal-refactors walkthrough concern.
 - `docint-pr-31` — refactor: slim DocumentController via service extraction (20 files, 1785/-513). 5 expected Findings covering transactional boundaries on bulk operations, N+1 in extracted bulk service, authorization-check loss during extraction, presenter eager-loading, form-request sharing.
 - `docint-pr-28` — fix: pdf viewer blank canvas (6 files, 30/-4). 4 expected Findings covering npm postinstall portability, Map.prototype polyfill safety, hardcoded asset URLs vs subpath deploys, race-window in renderScale watcher. **Fix-shape** PR — exercises reviewer behaviour on small targeted changes, distinct from the two large refactor fixtures.
+- `docint-pr-29` — test: pin architectural seams (4 files, 290/-0). **Test-only PR**. 2 expected low-severity Findings only — fixture probes whether the reviewer correctly recognises test-infrastructure PRs without over-flagging.
+- `docint-pr-30` — refactor: centralise tenant scoping via middleware priority (6 files, 84/-50). The "before #35" tenant centralization step. 5 expected Findings covering middleware-priority correctness, asymmetric scope-test coverage (Document yes, Matter/Comment no), arch-rule false-negatives, parent/child consistency guard loss, phpunit testsuite invocation.
 
-Suggested next fixtures (do not require my involvement — follow the protocol above):
-- `docint-pr-29` — `test: pin architectural seams` — test-only change. Tests that the reviewer correctly produces few/no Findings on test additions.
-- `cdv-rabbit/<commit>` — pick any commit from this repo's main history that you have an opinion on. Self-eval helps catch the reviewer being too lenient on its own code.
-- `intranet-cdv/<commit>` — older Laravel surface. Tests generalisation.
+cdv-rabbit (self-eval, 3):
+- `cdv-rabbit-1dec69a` — fix(llm): normalize OpenAI rate-limit reset header into ISO-8601 (1 file, 36/-1). 3 expected Findings covering Carbon::now() timezone-awareness, regex alternation ordering / no-anchor fragility, missing unit tests for a pure normalizer. Small-fix shape.
+- `cdv-rabbit-19d2df8` — feat(scm): Github WebhookController + shared WebhookIngestionPipeline + uninstall handler (7 files, 433/-36). 6 expected Findings covering HMAC fail-open on missing secret, repository-by-scm-repo-id without installation cross-check, cross-provider scm_delivery_id collision, dispatch-before-commit race, installation.deleted blast radius, csrf-exemption inconsistency. Feature-shape PR.
+- `cdv-rabbit-1630399` — test(scm): Phase 6 verifier — arch invariants + AC matrix (2 files, 146/-0). **Test-only verifier PR**. 3 expected Findings covering substring-vs-prefix grep risk in the AC matrix, source-grep brittleness vs PhpParser / Pest arch rules, contract-method-list pinning friction.
+
+intranet-cdv (2):
+- `intranet-cdv-19159e4` — fix(hubspot): named-parameter form + swallow exceptions in pagination loop (1 file, 3/-2). 3 expected Findings covering the post-break dereference on undefined $response, silent truncation of the owners dataset, and the load-bearing SDK-signature-drift implication.
+- `intranet-cdv-73d590b` — fix(allocation): show consolidated FGC / Crédito Privado exposure (7 files, 91/-25). 5 expected Findings covering the optional-prop fallback re-introducing the bug, perf cost of filter→filter pipeline, denominator semantics on % PL, structural prop grouping, subtitle copy-duplication / i18n. Frontend Vue/TS shape — exercises the reviewer outside Laravel surface.
+
+Diversity coverage:
+- Shapes: 3 small fix, 3 large refactor, 2 test-only, 1 feature, 1 frontend-Vue.
+- Surfaces: Laravel controllers, services, middleware, queue jobs, webhook ingestion, Pest arch rules, Vue 3 composables, TypeScript composables, npm/Vite build scripts, OpenAI/Anthropic transport.
+- Severities: at least one high-severity Finding (cdv-rabbit-19d2df8 HMAC fail-open, docint-pr-30 middleware priority correctness); the rest distribute medium/low.

@@ -1,0 +1,36 @@
+{
+  "fixture_id": "intranet-cdv-19159e4",
+  "pr_summary": "One-file hotfix in src/app/Services/HubspotService.php::getAllOwnersFromPages(). Switches $this->hubspot_api->getOwners($offset) to named-parameter form getOwners(offset: $offset) (suggesting a positional-arg mismatch upstream), adds `break;` to the catch block so the do/while doesn't loop on a stale $response after an exception, and null-coalesces $response->results to []. 1 file / +3 / -2.",
+  "expected_findings": [
+    {
+      "path": "src/app/Services/HubspotService.php",
+      "line_range": [54, 60],
+      "severity": "medium",
+      "category": "bug",
+      "rationale": "After the `break;` is added inside catch, the line `$results = $results->concat($response->results ?? [])` still runs in the iteration that threw — but `$response` is whatever the *previous* successful iteration left in scope (or undefined on the very first attempt). On a first-iteration exception, `$response` is undefined and `$response->results` warns/throws. Either move the break BEFORE the concat (preferred) or initialize `$response = null` before the loop and short-circuit the concat with a null check. As written, the catch silences the network error but the next line still risks a Trying-to-get-property-of-non-object error on cold start.",
+      "must_find": true
+    },
+    {
+      "path": "src/app/Services/HubspotService.php",
+      "line_range": [55, 62],
+      "severity": "medium",
+      "category": "bug",
+      "rationale": "Silent break-on-error means a partial owners collection is returned as if it were the complete dataset. Callers downstream (e.g. mapping CDV partners → HubSpot owners) cannot distinguish 'HubSpot has 200 owners and we fetched all 200' from 'HubSpot has 1000 owners but page 3 errored, we returned 200'. The Log::error message is the only trace. Prefer rethrowing after logging when 0 pages were fetched, or returning a Result-shaped wrapper so callers can detect truncation. At minimum, the rationale for swallowing the exception should be a comment so the next maintainer doesn't reintroduce the throw 'for safety'.",
+      "must_find": true
+    },
+    {
+      "path": "src/app/Services/HubspotService.php",
+      "line_range": [53, 53],
+      "severity": "low",
+      "category": "maintainability",
+      "rationale": "Switching to named-parameter form (offset: $offset) is the right call (PHP 8+ best practice, especially for SDK methods that often accept many optional args). But the commit message and surrounding code give no hint of WHY positional was wrong — if the HubSpot SDK getOwners signature changed (e.g. limit moved before offset in a version bump), this is a load-bearing fix that other call sites also need. Reviewer should grep for `->getOwners(` elsewhere in the repo and confirm every site uses named form.",
+      "must_find": false
+    }
+  ],
+  "expected_walkthrough_mentions": [
+    "small-fix shape PR",
+    "hotfix to HubSpot owners pagination",
+    "exception is now caught and swallowed inside the loop",
+    "named-parameter style indicates an SDK signature drift"
+  ]
+}

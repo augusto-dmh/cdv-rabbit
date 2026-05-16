@@ -1,0 +1,20 @@
+diff --git a/src/app/Services/HubspotService.php b/src/app/Services/HubspotService.php
+index ef04434fe..aba226f51 100644
+--- a/src/app/Services/HubspotService.php
++++ b/src/app/Services/HubspotService.php
+@@ -52,12 +52,13 @@ public function getAllOwnersFromPages(): Collection
+ 
+         do {
+             try {
+-                $response = $this->hubspot_api->getOwners($offset);
++                $response = $this->hubspot_api->getOwners(offset: $offset);
+             } catch (Exception $e) {
+                 Log::error("Error get owners from Hubspot: {$e->getMessage()}");
++                break;
+             }
+ 
+-            $results = $results->concat($response->results);
++            $results = $results->concat($response->results ?? []);
+             $offset = data_get($response, 'paging.next.after');
+         } while ($offset);
+ 
