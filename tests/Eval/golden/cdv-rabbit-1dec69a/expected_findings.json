@@ -1,0 +1,36 @@
+{
+  "fixture_id": "cdv-rabbit-1dec69a",
+  "pr_summary": "Single-file fix in app/Support/OpenAiTransportMiddleware.php. OpenAI returns x-ratelimit-reset-tokens as a duration string ('5.123s', '1m30s', '200ms'), which the middleware forwarded raw into OpenAiHeaderBag → LlmCallTelemetry → Carbon::parse → DB INSERT, crashing the telemetry write with InvalidFormatException. The fix adds a normalizeResetHeader() helper that parses the duration via preg_match_all('/(\\d+(?:\\.\\d+)?)(ms|s|m|h)/'), sums the components, and returns now() + duration as an ISO-8601 string (matching Anthropic's pre-existing format). 1 file / +36 / -1.",
+  "expected_findings": [
+    {
+      "path": "app/Support/OpenAiTransportMiddleware.php",
+      "line_range": [56, 58],
+      "severity": "medium",
+      "category": "bug",
+      "rationale": "Carbon::now() captures the server's local time and toIso8601String() includes the local offset. Downstream LlmCallTelemetry::ratelimit_tokens_reset is a timestamp column — if the DB column is `timestamp` (without timezone) and APP_TIMEZONE differs from DB session timezone, the stored value drifts. Anthropic returns UTC by spec. Prefer Carbon::now('UTC')->addMilliseconds(...)->toIso8601String() (or ->toAtomString()) so both providers produce comparable UTC-anchored timestamps regardless of APP_TIMEZONE.",
+      "must_find": true
+    },
+    {
+      "path": "app/Support/OpenAiTransportMiddleware.php",
+      "line_range": [42, 54],
+      "severity": "medium",
+      "category": "bug",
+      "rationale": "The regex /(\\d+(?:\\.\\d+)?)(ms|s|m|h)/ matches with `s` listed before `ms` in the alternation order doesn't matter because PCRE uses the longest match at the current position, BUT 'ms' is matched as one token by the *literal* alternation 'ms|s|m|h' only because 'ms' appears first. Reorder makes this fragile: someone refactoring to 's|m|h|ms' would cause '200ms' to match as '200s' + leftover 'm'. Lock this with a unit test asserting '200ms' parses to 0.2 seconds (not 200 seconds). The current implementation also silently succeeds on garbage strings containing valid token suffixes anywhere ('foo5s' -> 5s); use preg_match in /^...$/ anchored form or require all tokens to consume the input.",
+      "must_find": true
+    },
+    {
+      "path": "app/Support/OpenAiTransportMiddleware.php",
+      "line_range": [33, 41],
+      "severity": "low",
+      "category": "maintainability",
+      "rationale": "The helper is private static and there's no test added in this commit. A normalizer with five unit branches (ms/s/m/h plus the empty/no-match/zero edge cases) is the kind of pure function that warrants explicit unit coverage — especially since the bug it fixes was found in production. Make it `public static` (or extract to a small Support\\OpenAi\\DurationParser class) and add a unit test covering: '5.123s', '1m30s', '200ms', '2h1m', '', 'garbage', '0s'. Adds tens of lines of test coverage to a bug that already shipped once.",
+      "must_find": false
+    }
+  ],
+  "expected_walkthrough_mentions": [
+    "normalises OpenAI x-ratelimit-reset-tokens duration to ISO-8601",
+    "single-file fix",
+    "no test added alongside the bug-fix",
+    "timezone-awareness of Carbon::now() is load-bearing for cross-provider comparability"
+  ]
+}

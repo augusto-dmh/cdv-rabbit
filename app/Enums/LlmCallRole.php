@@ -9,4 +9,6 @@ enum LlmCallRole: string
     case Triage = 'triage';
     case Review = 'review';
     case Summary = 'summary';
+    case Draft = 'draft';
+    case Critique = 'critique';
 }

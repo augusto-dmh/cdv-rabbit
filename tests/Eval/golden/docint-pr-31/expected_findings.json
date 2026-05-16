@@ -1,0 +1,53 @@
+{
+  "fixture_id": "docint-pr-31",
+  "pr_summary": "Large controller-slim refactor extracting 5 service classes from DocumentController (BulkDocumentReviewService, DocumentManualReviewTransitioner, DocumentReviewerAssignmentService, DocumentShowPresenter, BulkDocumentReviewController) plus paired unit tests. DocumentController shrinks from ~530 LOC to ~70 LOC. 20 files / +1785 / -513.",
+  "expected_findings": [
+    {
+      "path": "app/Services/Documents/DocumentBulkReviewService.php",
+      "line_range": [1, 306],
+      "severity": "medium",
+      "category": "bug",
+      "rationale": "Bulk operations on documents (~306 LOC of bulk-iteration logic extracted from the controller) should run inside a single DB::transaction so partial failures don't leave the dataset in a torn state. The original controller block likely had no transaction either, but the extraction is the right moment to add one. A reviewer should flag the absence of a transaction boundary around the bulk write loop.",
+      "must_find": true
+    },
+    {
+      "path": "app/Services/Documents/DocumentBulkReviewService.php",
+      "line_range": [1, 306],
+      "severity": "medium",
+      "category": "perf",
+      "rationale": "Bulk iteration extracted from controller code is a classic N+1 risk: if each iteration touches an Eloquent relationship that wasn't eager-loaded, the service triggers N queries. The reviewer should verify the bulk loop uses with()/load() or chunked retrieval; flag if it does inline Document::find($id)->relationship inside the loop.",
+      "must_find": true
+    },
+    {
+      "path": "app/Services/Documents/DocumentReviewerAssignmentService.php",
+      "line_range": [1, 117],
+      "severity": "medium",
+      "category": "security",
+      "rationale": "When authorization-laden controller logic is extracted into a service, the auth checks (Gate::authorize / $this->authorize / can() calls) sometimes don't follow because services aren't in the request-auth pipeline. Reviewer should verify the service either receives an already-authorized User or re-asserts the authorize policy on Document/Reviewer — silent loss of the check is a real auth-bypass risk.",
+      "must_find": true
+    },
+    {
+      "path": "app/Services/Documents/DocumentShowPresenter.php",
+      "line_range": [1, 84],
+      "severity": "low",
+      "category": "maintainability",
+      "rationale": "Presenters that build view-data arrays often pull relationships lazily (e.g. $document->client->name). Without eager-loading, the show page becomes N+1-heavy as the presenter grows. Reviewer should suggest the presenter either accept an eager-loaded model or call ->load() up front.",
+      "must_find": false
+    },
+    {
+      "path": "app/Http/Controllers/BulkDocumentReviewController.php",
+      "line_range": [1, 65],
+      "severity": "low",
+      "category": "maintainability",
+      "rationale": "Splitting controllers is good but the new BulkDocumentReviewController should still inherit/use the same form-request validation surface as the original endpoint to avoid drift. Reviewer should verify the FormRequest class is shared, not duplicated.",
+      "must_find": false
+    }
+  ],
+  "expected_walkthrough_mentions": [
+    "extracts 5 service classes from DocumentController",
+    "controller slim",
+    "1785 lines added across 20 files — large PR; reviewability concern",
+    "paired unit tests added for each new service",
+    "transactional / authorization boundaries crossed during extraction need verification"
+  ]
+}

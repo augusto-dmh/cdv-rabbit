@@ -1,0 +1,66 @@
+{
+  "name": "review_result_v2",
+  "strict": true,
+  "description": "Returns a high-recall structured code review (Walkthrough + tiered Findings + collapsed Nitpicks) for the supplied diff",
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["summary", "findings", "nitpicks"],
+    "properties": {
+      "summary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["overview", "risk_level", "walkthrough", "files_analyzed"],
+        "properties": {
+          "overview": { "type": "string", "maxLength": 600 },
+          "risk_level": { "enum": ["low", "medium", "high"] },
+          "walkthrough": { "type": "string", "maxLength": 1200 },
+          "files_analyzed": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "classification"],
+              "properties": {
+                "path": { "type": "string" },
+                "classification": { "enum": ["reviewed", "skipped_vendor", "skipped_lockfile", "skipped_generated", "skipped_no_logic"] }
+              }
+            }
+          }
+        }
+      },
+      "findings": {
+        "type": "array",
+        "maxItems": 25,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "line", "severity", "category", "message", "suggestion"],
+          "properties": {
+            "path": { "type": "string" },
+            "line": { "type": "integer", "minimum": 1 },
+            "severity": { "enum": ["high", "medium", "low"] },
+            "category": { "enum": ["bug", "security", "perf", "maintainability"] },
+            "message": { "type": "string", "maxLength": 1500 },
+            "suggestion": { "type": ["string", "null"], "maxLength": 1500 }
+          }
+        }
+      },
+      "nitpicks": {
+        "type": "array",
+        "maxItems": 50,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "line", "message"],
+          "properties": {
+            "path": { "type": "string" },
+            "line": { "type": "integer", "minimum": 1 },
+            "message": { "type": "string", "maxLength": 500 }
+          }
+        }
+      }
+    }
+  }
+}

@@ -20,6 +20,22 @@ _Avoid_: bitbucket workspace, github org, account, tenant.
 The external large-language-model service (Anthropic Claude, OpenAI GPT) that performs the review. Selected per Workspace via `workspaces.llm_provider` enum. Orthogonal to SCM Provider.
 _Avoid_: model provider, AI vendor, LLM backend.
 
+**Review**:
+The bot's full output for one pull request: a Walkthrough, zero or more Findings, zero or more Nitpicks, and a risk-level. One Review per (Pull Request × Workspace × schema version). Persisted as a `reviews` row; emitted to the SCM as one summary comment plus inline comments for each Finding.
+_Avoid_: review comment (that's one **Finding**), review result, review pass.
+
+**Walkthrough**:
+The narrative section of a Review that describes scope of the change, cross-cutting concerns, and reviewability observations (e.g. "this PR bundles three orthogonal refactors"). Posted once as part of the summary comment. Distinct from a **Finding** — never line-anchored, never actionable on its own.
+_Avoid_: summary, overview, description.
+
+**Finding**:
+A single actionable issue surfaced by the Review: line-anchored, severity-tagged (`high|medium|low`), category-tagged (`bug|security|perf|maintainability`). Always posted as an inline comment by `CommentPoster`. Capped at 25 per Review.
+_Avoid_: comment, issue, remark, observation.
+
+**Nitpick**:
+A cosmetic or stylistic suggestion that does not block merge — collapsed into a single rolled-up section of the summary comment, never posted inline. Distinct from a low-severity **Finding**: a Nitpick has no correctness or maintainability impact; a low Finding has small but real impact.
+_Avoid_: nit (in code/schemas, write `nitpick`), style comment, formatting note.
+
 ## Relationships
 
 - A **Workspace** has exactly one **SCM Provider** at a time.

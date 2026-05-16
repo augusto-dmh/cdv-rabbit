@@ -1,0 +1,13 @@
+{
+    "fixture_id": "intranet-cdv-19159e4",
+    "source_repo": "intranet-cdv (private bitbucket)",
+    "commit_sha": "19159e46e299628e4be58eafd3afcb77c08f0963",
+    "title": "fix: update getOwners method call to use named parameters and handle potential null results",
+    "branch": "hotfix/getOwners-parameter",
+    "base": "08dc5c52f",
+    "author": "Héric dos Santos Lopes",
+    "file_count": 1,
+    "additions": 3,
+    "deletions": 2,
+    "captured_from": "git diff 19159e46e^..19159e46e in /home/augusto/projects/intranet-cdv"
+}

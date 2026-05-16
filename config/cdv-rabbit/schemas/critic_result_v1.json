@@ -1,0 +1,26 @@
+{
+  "name": "critic_result",
+  "strict": true,
+  "description": "Per-Finding verdict from the critic pass — one decision per Finding in the draft, in the same order.",
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["decisions"],
+    "properties": {
+      "decisions": {
+        "type": "array",
+        "maxItems": 25,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["finding_index", "verdict", "reason"],
+          "properties": {
+            "finding_index": { "type": "integer", "minimum": 0 },
+            "verdict": { "enum": ["approve", "reject"] },
+            "reason": { "type": "string", "maxLength": 300 }
+          }
+        }
+      }
+    }
+  }
+}

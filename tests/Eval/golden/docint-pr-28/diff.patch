@@ -1,0 +1,106 @@
+diff --git a/.gitignore b/.gitignore
+index 5504403..f9fc5a2 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -3,6 +3,7 @@
+ /node_modules
+ /public/build
+ /public/hot
++/public/pdfjs
+ /public/storage
+ /storage/*.key
+ /storage/pail
+diff --git a/app/Http/Controllers/DocumentController.php b/app/Http/Controllers/DocumentController.php
+index 270ad2b..29a57c5 100644
+--- a/app/Http/Controllers/DocumentController.php
++++ b/app/Http/Controllers/DocumentController.php
+@@ -126,6 +126,7 @@ public function preview(Document $document): StreamedResponse
+             'Content-Disposition' => HeaderUtils::makeDisposition(
+                 HeaderUtils::DISPOSITION_INLINE,
+                 $document->file_name,
++                Str::ascii($document->file_name),
+             ),
+             'Content-Type' => 'application/pdf',
+             'X-Content-Type-Options' => 'nosniff',
+diff --git a/package.json b/package.json
+index 247629a..18ea0d5 100644
+--- a/package.json
++++ b/package.json
+@@ -10,7 +10,8 @@
+         "format:check": "prettier --check resources/",
+         "lint": "eslint . --fix",
+         "lint:check": "eslint .",
+-        "types:check": "vue-tsc --noEmit"
++        "types:check": "vue-tsc --noEmit",
++        "postinstall": "mkdir -p public/pdfjs && cp -r node_modules/pdfjs-dist/cmaps public/pdfjs/ && cp -r node_modules/pdfjs-dist/standard_fonts public/pdfjs/"
+     },
+     "devDependencies": {
+         "@eslint/js": "^9.19.0",
+diff --git a/resources/js/app.ts b/resources/js/app.ts
+index e5f437a..148dccf 100644
+--- a/resources/js/app.ts
++++ b/resources/js/app.ts
+@@ -1,3 +1,4 @@
++import './polyfills';
+ import { createInertiaApp } from '@inertiajs/vue3';
+ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
+ import type { DefineComponent } from 'vue';
+diff --git a/resources/js/components/documents/PdfViewer.vue b/resources/js/components/documents/PdfViewer.vue
+index 7df0178..34ba2fe 100644
+--- a/resources/js/components/documents/PdfViewer.vue
++++ b/resources/js/components/documents/PdfViewer.vue
+@@ -231,7 +231,12 @@ async function loadDocument(): Promise<void> {
+     await destroyDocumentHandle();
+ 
+     try {
+-        loadingTask = getDocument(props.src) as PdfLoadingTask;
++        loadingTask = getDocument({
++            url: props.src,
++            cMapUrl: '/pdfjs/cmaps/',
++            cMapPacked: true,
++            standardFontDataUrl: '/pdfjs/standard_fonts/',
++        }) as PdfLoadingTask;
+         documentHandle = await loadingTask.promise;
+         const firstPage = await documentHandle.getPage(1);
+         naturalPageWidth = firstPage.getViewport({ scale: 1 }).width;
+@@ -314,7 +319,7 @@ watch(
+ );
+ 
+ watch(renderScale, async () => {
+-    if (documentHandle === null) {
++    if (documentHandle === null || loading.value) {
+         return;
+     }
+ 
+@@ -327,7 +332,10 @@ onMounted(() => {
+ 
+         syncFitScale();
+ 
+-        if (Math.abs(previousFitScale - fitScale.value) > 0.01) {
++        if (
++            Math.abs(previousFitScale - fitScale.value) > 0.01 &&
++            !loading.value
++        ) {
+             void renderPages();
+         }
+     });
+diff --git a/resources/js/polyfills.ts b/resources/js/polyfills.ts
+new file mode 100644
+index 0000000..4dffa21
+--- /dev/null
++++ b/resources/js/polyfills.ts
+@@ -0,0 +1,14 @@
++// TODO: Remove when minimum browser target supports Map.prototype.getOrInsertComputed
++// (Chrome 131+, or when pdfjs-dist ships its own polyfill)
++if (!('getOrInsertComputed' in Map.prototype)) {
++    // @ts-expect-error polyfill for TC39 Stage 3 proposal
++    Map.prototype.getOrInsertComputed = function <K, V>(
++        key: K,
++        callback: (key: K) => V,
++    ): V {
++        if (!this.has(key)) {
++            this.set(key, callback(key));
++        }
++        return this.get(key) as V;
++    };
++}

@@ -1,0 +1,13 @@
+{
+  "fixture_id": "docint-pr-28",
+  "source_repo": "augusto-dmh/DocInt",
+  "pr_number": 28,
+  "title": "fix: fix pdf viewer blank canvas rendering",
+  "branch": "fix/pdf-viewer-blank-canvas",
+  "base": "master",
+  "author": "augusto-dmh",
+  "file_count": 6,
+  "additions": 30,
+  "deletions": 4,
+  "captured_from": "gh pr diff 28 --repo augusto-dmh/DocInt"
+}

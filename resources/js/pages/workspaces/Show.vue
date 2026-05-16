@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Form, Head, Link, router } from '@inertiajs/vue3';
 import { ExternalLink, RefreshCw } from 'lucide-vue-next';
+import { computed } from 'vue';
 import ConnectController from '@/actions/App/Http/Controllers/Workspaces/ConnectController';
 import RepositoryController from '@/actions/App/Http/Controllers/Workspaces/RepositoryController';
 import { index, update } from '@/actions/App/Http/Controllers/Workspaces/WorkspaceController';
@@ -26,6 +27,7 @@ type Workspace = {
     health: string;
     kill_switch_enabled: boolean;
     llm_provider: string;
+    review_schema_version: 'v1' | 'v2';
     scm_provider: 'bitbucket_cloud' | 'github_cloud';
     scm_owner_slug: string | null;
     github_installation_id: string | null;
@@ -70,6 +72,26 @@ function updateProvider(provider: string): void {
         { preserveScroll: true },
     );
 }
+
+function updateSchemaVersion(version: string): void {
+    router.patch(
+        update.url(props.workspace.slug),
+        { review_schema_version: version },
+        { preserveScroll: true },
+    );
+}
+
+const isGithub = computed(() => props.workspace.scm_provider === 'github_cloud');
+
+const isConnected = computed(() =>
+    isGithub.value
+        ? props.workspace.github_installation_id !== null
+        : props.workspace.scm_owner_slug !== null,
+);
+
+const providerLabel = computed(() => (isGithub.value ? 'GitHub' : 'Bitbucket'));
+
+const repoBaseUrl = computed(() => (isGithub.value ? 'https://github.com/' : 'https://bitbucket.org/'));
 </script>
 
 <template>
@@ -120,11 +142,31 @@ function updateProvider(provider: string): void {
             </CardContent>
         </Card>
 
+        <Card v-if="isAdmin">
+            <CardHeader>
+                <CardTitle class="text-sm font-medium">Review Schema Version</CardTitle>
+            </CardHeader>
+            <CardContent class="space-y-2">
+                <p class="text-sm text-muted-foreground">
+                    v2 enables CodeRabbit-style high-recall reviews with the draft → critique pipeline. ~2× LLM cost per review. Per-Workspace rollout.
+                </p>
+                <Select :default-value="workspace.review_schema_version" @update:model-value="updateSchemaVersion">
+                    <SelectTrigger class="w-56">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="v1">v1 (classic)</SelectItem>
+                        <SelectItem value="v2">v2 (high-recall, beta)</SelectItem>
+                    </SelectContent>
+                </Select>
+            </CardContent>
+        </Card>
+
         <Card>
             <CardHeader class="flex flex-row items-center justify-between space-y-0">
                 <CardTitle>Repositories</CardTitle>
                 <Form
-                    v-if="workspace.scm_owner_slug"
+                    v-if="isConnected"
                     v-bind="RepositoryController.sync.form(workspace.slug)"
                     v-slot="{ processing }"
                 >
@@ -136,10 +178,10 @@ function updateProvider(provider: string): void {
             </CardHeader>
             <CardContent>
                 <div v-if="repositories.length === 0" class="py-8 text-center text-sm text-muted-foreground">
-                    <p v-if="!workspace.scm_owner_slug">
-                        Connect your Bitbucket workspace first to discover repositories.
+                    <p v-if="!isConnected">
+                        Connect your {{ providerLabel }} {{ isGithub ? 'installation' : 'workspace' }} first to discover repositories.
                     </p>
-                    <p v-else>No repositories found. Click "Sync repositories" to import from Bitbucket.</p>
+                    <p v-else>No repositories found. Click "Sync repositories" to import from {{ providerLabel }}.</p>
                 </div>
 
                 <table v-else class="w-full text-sm">
@@ -156,7 +198,7 @@ function updateProvider(provider: string): void {
                         <tr v-for="repo in repositories" :key="repo.id" class="border-b last:border-0">
                             <td class="py-3 pr-4 font-medium">
                                 <a
-                                    :href="`https://bitbucket.org/${repo.full_name}`"
+                                    :href="`${repoBaseUrl}${repo.full_name}`"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     class="flex items-center gap-1 hover:underline"

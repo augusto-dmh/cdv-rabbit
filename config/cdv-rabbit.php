@@ -43,4 +43,19 @@ return [
      * The rabbit:lgpd-check command fails until this is populated when any workspace uses GitHub.
      */
     'github_dpa_url' => env('GITHUB_DPA_URL'),
+
+    /*
+     * Cost-per-review multiplier applied to the per-job token reservation.
+     * v1 reviews issue 1 LLM call. v2 reviews issue 2 calls (draft + critique),
+     * so the reservation is doubled by default. Operators may tune this once
+     * production telemetry confirms the cache-hit-adjusted ratio.
+     */
+    'cost_per_review_factor' => (int) env('CDV_RABBIT_COST_PER_REVIEW_FACTOR', 2),
+
+    /*
+     * AC51: commit-status context name posted by ReviewPullRequestJob on the PR head SHA.
+     * Consumer repos add this string to their branch protection's required-status-checks
+     * to gate auto-merge on cdv-rabbit reviews.
+     */
+    'status_check_context' => (string) env('CDV_RABBIT_STATUS_CHECK_CONTEXT', 'cdv-rabbit/review'),
 ];

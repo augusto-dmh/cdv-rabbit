@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ReviewSchemaVersion;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -29,6 +30,14 @@ class WorkspaceFactory extends Factory
             'health' => 'healthy',
             'daily_token_cap' => 200000,
             'daily_token_cap_alert_threshold' => 70,
+            'review_schema_version' => ReviewSchemaVersion::V1,
         ];
+    }
+
+    public function v2(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'review_schema_version' => ReviewSchemaVersion::V2,
+        ]);
     }
 }

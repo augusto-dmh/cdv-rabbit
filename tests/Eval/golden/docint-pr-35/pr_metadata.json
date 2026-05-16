@@ -1,0 +1,15 @@
+{
+    "fixture_id": "docint-pr-35",
+    "title": "refactor: extract dashboard aggregations + cross-tenant guard trait",
+    "branch": "test/cdv-rabbit-review-deep",
+    "base_branch": "main",
+    "author": "augusto-dmh",
+    "repo_slug": "augusto-dmh/DocInt",
+    "scm_provider": "github_cloud",
+    "head_sha": "457e5942162a324c7bde6ec02cf6d9562231ccec",
+    "base_sha": "403dfa4",
+    "files_changed": 8,
+    "additions": 233,
+    "deletions": 110,
+    "summary": "Three orthogonal refactors bundled into one PR: (1) extract EnsuresSameTenant trait used by multiple controllers, (2) extract DashboardAggregator service + DocumentSummaryDto from a fat DashboardController, (3) introduce a new DocumentStatus enum. v1 of the review pipeline returned zero Findings on this PR; v2 is expected to surface at least the four expected_findings recorded in expected_findings.json."
+}

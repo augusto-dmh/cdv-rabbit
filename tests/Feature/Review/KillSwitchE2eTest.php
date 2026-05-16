@@ -17,6 +17,7 @@ use App\Services\Review\CostReservationInterface;
 use App\Support\AnthropicHeaderBag;
 use Illuminate\Support\Facades\Http;
 use Tests\Fakes\FakeCostReservation;
+use Tests\Fakes\StubsV2LlmDriverMethods;
 
 afterEach(function (): void {
     app(WorkspaceContext::class)->clear();
@@ -30,6 +31,8 @@ test('AC8: kill switch on — job marks review skipped, no LLM call', function (
     $llmCalled = false;
     app()->bind(LlmDriverInterface::class, fn () => new class($llmCalled) implements LlmDriverInterface
     {
+        use StubsV2LlmDriverMethods;
+
         public function __construct(private bool &$called) {}
 
         public function getSystemPrompt(): string
@@ -84,6 +87,8 @@ test('AC8: kill switch toggled on mid-flight stops next job dispatch', function 
     $llmCalledOff = false;
     app()->bind(LlmDriverInterface::class, fn () => new class($llmCalledOff) implements LlmDriverInterface
     {
+        use StubsV2LlmDriverMethods;
+
         public function __construct(private bool &$called) {}
 
         public function getSystemPrompt(): string
@@ -164,6 +169,8 @@ test('AC8: kill switch toggled on mid-flight stops next job dispatch', function 
     $llmCalledOn = false;
     app()->bind(LlmDriverInterface::class, fn () => new class($llmCalledOn) implements LlmDriverInterface
     {
+        use StubsV2LlmDriverMethods;
+
         public function __construct(private bool &$called) {}
 
         public function getSystemPrompt(): string

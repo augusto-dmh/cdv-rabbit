@@ -1,0 +1,37 @@
+{
+  "fixture_id": "cdv-rabbit-1630399",
+  "pr_summary": "Test-only PR closing Phase 6. Adds tests/Unit/Services/Scm/ScmArchTest.php with 7 arch invariants (driver interface conformance, DTOs final+readonly, exception parent class, ReviewPullRequestJob+CommentPoster provider-agnostic via source-grep, Services/Bitbucket directory removed, ScmDriverInterface declares exactly 11 named methods) and tests/Feature/Scm/Phase6AcMatrixTest.php — a grep-based scanner that asserts each AC27..AC38 is referenced by at least one named test. 2 files / +146 / -0. No production code touched. Distinct in shape from cdv-rabbit-19d2df8 (which was a feature PR) and complementary to docint-pr-29 (which was also test-only but in a different repo): this fixture probes whether the reviewer correctly recognises 'verifier' test-only PRs vs over-flagging on grep-based scanners.",
+  "expected_findings": [
+    {
+      "path": "tests/Feature/Scm/Phase6AcMatrixTest.php",
+      "line_range": [40, 56],
+      "severity": "medium",
+      "category": "bug",
+      "rationale": "The matrix test uses `scanForAc(\"{$ac}:\")` with fallbacks to `({$ac} ` and `{$ac} arch`. Substring matching across the whole tests/ tree means `AC3:` matches AC3, AC30, AC31, AC32 ... AC38 prose any time those numbers appear with a colon — wait, `AC30:` does NOT contain `AC3:` as a prefix-match because the substring scan uses str_contains which is positional, so 'AC30:' will satisfy `scanForAc('AC3:')` (substring of 'AC30:' contains 'AC3:'? -> 'AC3:' is a substring of 'AC30:'? No, 'AC30:' has the chars A,C,3,0,: so 'AC3:' is NOT a substring. But `AC3:` *is* a substring of `AC30:` if you consider only the first three chars + the colon... actually it's NOT — 'AC3:' requires the literal 4-char run, and 'AC30:' has 'AC30' then ':' so 'AC3' then '0' breaks it. OK, the namespace happens to be safe for AC3 today, but the moment ACs cross 100 / get reordered the test silently passes on false matches. Prefer a regex-anchored scan (`/\\bAC\\d+:/` with the captured number compared exactly) or store ACs in a structured registry that tests import.",
+      "must_find": true
+    },
+    {
+      "path": "tests/Unit/Services/Scm/ScmArchTest.php",
+      "line_range": [49, 67],
+      "severity": "medium",
+      "category": "maintainability",
+      "rationale": "AC38 invariants for ReviewPullRequestJob and CommentPoster do str_contains source-grep against literals like 'scm_provider', 'bitbucket_cloud', 'github_cloud', 'BitbucketDriver', 'GithubDriver'. This catches the *literal* form only — a future contributor can break the invariant by importing `use App\\Services\\Scm\\GithubDriver as GH;` and the test silently passes (GithubDriver string never appears verbatim post-aliasing). Better: assert on the imported FQCN list via PhpParser / nikic-tokens, or use Pest arch rule `expect(['App\\Jobs\\ReviewPullRequestJob'])->not->toUse('App\\Services\\Scm\\GithubDriver')` which respects the AST.",
+      "must_find": true
+    },
+    {
+      "path": "tests/Unit/Services/Scm/ScmArchTest.php",
+      "line_range": [70, 87],
+      "severity": "low",
+      "category": "maintainability",
+      "rationale": "The 'ScmDriverInterface declares exactly the 11 contract methods' test pins the method list with sort()+expect()->toBe([...]). This is intentional (it locks the contract), but every legitimate interface addition then requires the reviewer to update this test in lockstep. That's a documented friction point worth surfacing in the Walkthrough — for the reviewer's next pass, this is the canonical place where ADR-0001 ('SCM driver contract is 11 methods') is enforced; if the count drifts, ADR-0001 needs revision.",
+      "must_find": false
+    }
+  ],
+  "expected_walkthrough_mentions": [
+    "test-only verifier PR",
+    "no production code changed",
+    "arch invariants for SCM driver contract",
+    "grep-based AC coverage matrix (substring matching has false-positive risk)",
+    "source-string greps in lieu of AST analysis"
+  ]
+}

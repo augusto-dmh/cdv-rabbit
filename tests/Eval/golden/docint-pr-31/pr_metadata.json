@@ -1,0 +1,13 @@
+{
+  "fixture_id": "docint-pr-31",
+  "source_repo": "augusto-dmh/DocInt",
+  "pr_number": 31,
+  "title": "refactor: slim DocumentController via service extraction",
+  "branch": "refactor/slim-document-controller",
+  "base": "main",
+  "author": "augusto-dmh",
+  "file_count": 20,
+  "additions": 1785,
+  "deletions": 513,
+  "captured_from": "git diff 9aae890..82277a3 in /home/augusto/projects/DocInt-rabbit-test-2"
+}

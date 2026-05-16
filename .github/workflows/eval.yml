@@ -1,0 +1,61 @@
+# AC50: golden-PR eval CI gate for review pipeline v2.
+#
+# This workflow is the contract for `v2 prompt/schema gated by eval baseline`
+# documented in AGENTS.md §4. Any change to:
+#   - config/cdv-rabbit/prompts/review_v2.txt
+#   - config/cdv-rabbit/schemas/review_result_v2.json
+#   - app/Services/Llm/{ClaudeReviewer,OpenAiReviewer}.php (critique path)
+# must keep this workflow green before merging.
+#
+# OPERATIONAL PRECONDITIONS (configure in GitHub repo Settings → Secrets):
+#   - RABBIT_EVAL_LIVE=1 (env, not secret) — gates the live API call.
+#   - ANTHROPIC_API_KEY (secret) — used by ClaudeReviewer + LLM-judge.
+#   - OPENAI_API_KEY    (secret) — used by OpenAiReviewer + LLM-judge.
+#
+# Without those secrets, the job no-ops (graceful skip via the `if:` guard
+# below) so forks and PRs from public contributors do not fail spuriously.
+# Production gating is enforced by branch protection requiring this check.
+
+name: eval
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'config/cdv-rabbit/prompts/review_v2.txt'
+      - 'config/cdv-rabbit/schemas/review_result_v2.json'
+      - 'app/Services/Llm/**'
+      - 'app/Console/Commands/EvalCommand.php'
+      - 'tests/Eval/**'
+
+jobs:
+  golden-pr-eval:
+    runs-on: ubuntu-latest
+    if: ${{ vars.RABBIT_EVAL_LIVE == '1' && secrets.ANTHROPIC_API_KEY != '' && secrets.OPENAI_API_KEY != '' }}
+    env:
+      RABBIT_EVAL_LIVE: '1'
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+
+      - name: Install Dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Copy Environment File
+        run: cp .env.example .env
+
+      - name: Generate Application Key
+        run: php artisan key:generate
+
+      - name: Run golden-PR eval (live LLM calls, recall >= 0.7 gate)
+        run: ./vendor/bin/pest --testsuite=Eval --filter='GoldenPrEvalTest'

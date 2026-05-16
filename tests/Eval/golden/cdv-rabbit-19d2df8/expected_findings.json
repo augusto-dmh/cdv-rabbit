@@ -1,0 +1,61 @@
+{
+  "fixture_id": "cdv-rabbit-19d2df8",
+  "pr_summary": "Phase 6 / W6-T5: adds GitHub App webhook ingestion path. Extracts a shared WebhookIngestionPipeline (transactional insert + ReviewPullRequestJob dispatch + status update, idempotent via scm_delivery_id) from Bitbucket/WebhookController, refactors Bitbucket controller to use it, adds a new Github/WebhookController with X-Hub-Signature-256 HMAC verification + installation.deleted handling, registers the per-installation GithubInstallationManager that clears github_installation_id, marks workspace unhealthy and disables every owned repo, scaffolds routes/scm/github.php (csrf-exempt), and ships 7 feature tests covering AC33..AC36. 7 files / +433 / -36.",
+  "expected_findings": [
+    {
+      "path": "app/Http/Controllers/Github/WebhookController.php",
+      "line_range": [18, 28],
+      "severity": "high",
+      "category": "security",
+      "rationale": "The HMAC verification uses hash_hmac with a config-resolved secret cast to (string) — if GITHUB_APP_WEBHOOK_SECRET is unset, config('services.github.app_webhook_secret', '') returns ''. The check then computes 'sha256='.hash_hmac('sha256', $body, '') and compares it to whatever the caller sent. An attacker who knows the secret is empty can forge any payload by precomputing hash_hmac('sha256', $body, ''). Hardening: fail-closed when the secret is missing — `if ($secret === '') { abort(500); }` before computing the expected signature. Otherwise an env-loss outage downgrades to forge-allowed.",
+      "must_find": true
+    },
+    {
+      "path": "app/Http/Controllers/Github/WebhookController.php",
+      "line_range": [44, 56],
+      "severity": "medium",
+      "category": "security",
+      "rationale": "After HMAC passes, the controller looks up the repository via `Repository::withoutWorkspaceScope()->where('scm_repo_id', $scmRepoId)`. The scm_repo_id comes from `$request->json('repository.id')` cast to string. GitHub repository ids are globally unique numeric, but two pitfalls: (a) if the GH App is also installed on a fork/transferred repo with the same numeric id, the lookup matches the wrong workspace's row — the binding then calls `WorkspaceContext::bind($repository->workspace_id)` and dispatches the review job under the wrong tenant. (b) The HMAC check proves the secret-holder sent the payload, but does NOT prove this Workspace actually owns this installation_id. A reviewer should require cross-referencing the installation_id in the payload against the Workspace's stored github_installation_id before binding context.",
+      "must_find": true
+    },
+    {
+      "path": "app/Services/Webhook/WebhookIngestionPipeline.php",
+      "line_range": [29, 53],
+      "severity": "medium",
+      "category": "bug",
+      "rationale": "The idempotency check `WebhookDelivery::where('scm_delivery_id', $scmDeliveryId)->exists()` runs inside DB::transaction but the surrounding code relies on a uniqueness *guarantee* across providers. After Phase 6 both bitbucket_cloud and github_cloud share the webhook_deliveries table — Bitbucket's X-Hook-UUID and GitHub's X-GitHub-Delivery are independent UUID namespaces. The scm_provider column was added to differentiate them, but the dedupe key here is only scm_delivery_id (not the (scm_provider, scm_delivery_id) compound). If a Bitbucket UUID ever collides with a GitHub delivery id, the second delivery is silently dropped. Either include scm_provider in the dedupe predicate, or add a (scm_provider, scm_delivery_id) unique index and rely on the DB constraint instead of the SELECT-then-INSERT race.",
+      "must_find": true
+    },
+    {
+      "path": "app/Services/Webhook/WebhookIngestionPipeline.php",
+      "line_range": [37, 52],
+      "severity": "medium",
+      "category": "bug",
+      "rationale": "ReviewPullRequestJob::dispatch is called inside the DB::transaction. If the surrounding transaction commits but the queue driver acks the dispatch *before* commit (e.g. database-queue with the same connection, or after_commit not configured), the worker can pick up the job before WebhookDelivery is visible. Use `->afterCommit()` on the dispatch (Laravel 11 supports `ReviewPullRequestJob::dispatch(...)->afterCommit()`) or move the dispatch to after the transaction closes. Otherwise the worker may race on a not-yet-visible row.",
+      "must_find": true
+    },
+    {
+      "path": "app/Http/Controllers/Github/WebhookController.php",
+      "line_range": [33, 36],
+      "severity": "low",
+      "category": "security",
+      "rationale": "`installation` event uses `$request->json('installation.id')` cast to (string). The HMAC check above proved the payload is authentic, BUT a forged `installation.id` field still flows into GithubInstallationManager::handleUninstall, which queries `Workspace::where('github_installation_id', $installationId)` and disables every repo. An attacker who compromises the GitHub App webhook secret (or accidentally reuses it across environments) can null out installations they don't own. Mitigations live outside this PR (rotate secret per env, scope webhook secret per App), but a reviewer should call this out so the runbook captures the blast radius.",
+      "must_find": false
+    },
+    {
+      "path": "routes/scm/github.php",
+      "line_range": [9, 11],
+      "severity": "low",
+      "category": "maintainability",
+      "rationale": "The webhook route is registered via `->withoutMiddleware([VerifyCsrfToken::class])` on the named route. Bitbucket's equivalent uses the global csrf-exempt list in bootstrap/app.php (per the e8529ba commit earlier in this branch). Inconsistent exemption strategies make it easy to miss one provider when middleware is restructured (e.g. moving to Laravel 12's new middleware-priority API). Prefer adding `/scm/github/webhook` to the same exemption list Bitbucket uses, or migrate both providers to the per-route style.",
+      "must_find": false
+    }
+  ],
+  "expected_walkthrough_mentions": [
+    "shared webhook ingestion pipeline across providers",
+    "HMAC-SHA256 signature verification with per-App secret",
+    "installation.deleted disables every repo in the workspace",
+    "idempotency via scm_delivery_id (cross-provider key collision risk)",
+    "csrf-exempt webhook route"
+  ]
+}

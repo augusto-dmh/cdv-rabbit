@@ -14,6 +14,7 @@ use App\Services\Llm\LlmDriverInterface;
 use App\Services\Review\CostReservationInterface;
 use Illuminate\Support\Facades\Http;
 use Tests\Fakes\FakeCostReservation;
+use Tests\Fakes\StubsV2LlmDriverMethods;
 
 afterEach(function (): void {
     app(WorkspaceContext::class)->clear();
@@ -104,6 +105,8 @@ test('global env flag CDV_RABBIT_KILLED stops job from calling LLM', function ()
     $llmCalled = false;
     app()->bind(LlmDriverInterface::class, fn () => new class($llmCalled) implements LlmDriverInterface
     {
+        use StubsV2LlmDriverMethods;
+
         public function __construct(private bool &$called) {}
 
         public function getSystemPrompt(): string

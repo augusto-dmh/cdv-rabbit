@@ -1,0 +1,44 @@
+{
+    "fixture_id": "docint-pr-35",
+    "pr_summary": "Three orthogonal refactors bundled together: tenant guard trait extraction, dashboard aggregator extraction, and a new DocumentStatus enum.",
+    "expected_findings": [
+        {
+            "path": "app/Concerns/EnsuresSameTenant.php",
+            "line_range": [1, 18],
+            "severity": "medium",
+            "category": "security",
+            "rationale": "Trait should use abort(404) instead of abort(403) on tenant mismatch to avoid leaking the existence of cross-tenant resources to attackers (information disclosure on a missing-vs-forbidden side channel).",
+            "must_find": true
+        },
+        {
+            "path": "app/Services/Dashboard/DashboardAggregator.php",
+            "line_range": [1, 113],
+            "severity": "medium",
+            "category": "perf",
+            "rationale": "Extracted aggregator was lifted out of a 100-line block in DashboardController; review must verify the original eager-loading is preserved end-to-end, otherwise relationship access inside the aggregator becomes an N+1 query.",
+            "must_find": true
+        },
+        {
+            "path": "app/Enums/DocumentStatus.php",
+            "line_range": [1, 27],
+            "severity": "low",
+            "category": "maintainability",
+            "rationale": "New backed enum introduced without an accompanying migration note or back-compat plan for any pre-existing string-column status values in documents table; downstream code that compares against string literals may silently fail.",
+            "must_find": true
+        },
+        {
+            "path": "(pr-level)",
+            "line_range": [0, 0],
+            "severity": "low",
+            "category": "maintainability",
+            "rationale": "PR bundles three orthogonal refactors (trait extraction + dashboard slim + new enum/DTO) which makes review and isolated revert harder. Walkthrough should mention this so reviewers can request a split.",
+            "must_find": true
+        }
+    ],
+    "expected_walkthrough_mentions": [
+        "three orthogonal refactors",
+        "trait extraction",
+        "dashboard aggregator",
+        "DocumentStatus enum"
+    ]
+}

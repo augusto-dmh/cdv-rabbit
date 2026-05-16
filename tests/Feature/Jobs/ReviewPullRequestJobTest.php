@@ -23,6 +23,7 @@ use App\Support\AnthropicHeaderBag;
 use App\Support\RetryDecision;
 use Illuminate\Support\Facades\Http;
 use Tests\Fakes\FakeCostReservation;
+use Tests\Fakes\StubsV2LlmDriverMethods;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -139,6 +140,8 @@ function bindFakeLlm(?Closure $callback = null): void
 
     app()->bind(LlmDriverInterface::class, fn () => new class($cb) implements LlmDriverInterface
     {
+        use StubsV2LlmDriverMethods;
+
         public function __construct(private Closure $cb) {}
 
         public function getSystemPrompt(): string

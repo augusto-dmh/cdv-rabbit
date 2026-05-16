@@ -1,0 +1,13 @@
+{
+    "fixture_id": "docint-pr-30",
+    "source_repo": "augusto-dmh/DocInt",
+    "pr_number": 30,
+    "title": "refactor: centralise tenant scoping via middleware priority",
+    "branch": "refactor/centralise-tenant-scoping",
+    "base": "main",
+    "author": "augusto-dmh",
+    "file_count": 6,
+    "additions": 84,
+    "deletions": 50,
+    "captured_from": "git diff 403dfa4^..276918e in /home/augusto/projects/DocInt-rabbit-test-2"
+}

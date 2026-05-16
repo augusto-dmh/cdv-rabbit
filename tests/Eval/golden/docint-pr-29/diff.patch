@@ -1,0 +1,323 @@
+diff --git a/tests/Architecture/ArchitecturalRulesTest.php b/tests/Architecture/ArchitecturalRulesTest.php
+new file mode 100644
+index 0000000..057fc98
+--- /dev/null
++++ b/tests/Architecture/ArchitecturalRulesTest.php
+@@ -0,0 +1,43 @@
++<?php
++
++declare(strict_types=1);
++
++arch('policies depend only on models and the permission system')
++    ->expect('App\Policies')
++    ->not->toUse([
++        'Illuminate\Http',
++        'Illuminate\Support\Facades\DB',
++        'App\Http',
++    ]);
++
++arch('models do not depend on http')
++    ->expect('App\Models')
++    ->not->toUse([
++        'Illuminate\Http',
++        'App\Http',
++    ]);
++
++arch('controllers do not bypass eloquent with the DB facade')
++    ->expect('App\Http\Controllers')
++    ->not->toUse('Illuminate\Support\Facades\DB');
++
++arch('form requests extend FormRequest')
++    ->expect('App\Http\Requests')
++    ->toExtend('Illuminate\Foundation\Http\FormRequest');
++
++arch('production code does not call env() directly')
++    ->expect('App')
++    ->not->toUse('env');
++
++arch('superadmin checks live in a reviewed allowlist')
++    ->expect('hasSuperAdminRole')
++    ->toOnlyBeUsedIn([
++        'App\Models\User',
++        'App\Providers\AppServiceProvider',
++        'App\Http\Middleware\HandleInertiaRequests',
++        'App\Http\Middleware\EnsureSuperAdmin',
++        'App\Http\Middleware\InitializeTenantContext',
++        'App\Http\Controllers\DashboardController',
++        'App\Http\Controllers\Admin\QueueHealthController',
++        'App\Broadcasting\BroadcastChannelAuthorizer',
++    ]);
+diff --git a/tests/Feature/Policies/DocumentPolicyTest.php b/tests/Feature/Policies/DocumentPolicyTest.php
+new file mode 100644
+index 0000000..300121a
+--- /dev/null
++++ b/tests/Feature/Policies/DocumentPolicyTest.php
+@@ -0,0 +1,89 @@
++<?php
++
++declare(strict_types=1);
++
++use App\Models\Client;
++use App\Models\Document;
++use App\Models\Matter;
++use App\Models\Tenant;
++use App\Models\User;
++use Database\Seeders\RolesAndPermissionsSeeder;
++use Illuminate\Support\Facades\Gate;
++use Spatie\Permission\PermissionRegistrar;
++
++beforeEach(function (): void {
++    (new RolesAndPermissionsSeeder)->run();
++    app(PermissionRegistrar::class)->forgetCachedPermissions();
++});
++
++afterEach(function (): void {
++    setPermissionsTeamId(null);
++    tenancy()->end();
++});
++
++function policyFixtures(): array
++{
++    $tenant = Tenant::factory()->create();
++    $user = User::factory()->forTenant($tenant)->create();
++    $client = Client::factory()->create(['tenant_id' => $tenant->id]);
++    $matter = Matter::factory()->create(['tenant_id' => $tenant->id, 'client_id' => $client->id]);
++    $document = Document::factory()->create(['tenant_id' => $tenant->id, 'matter_id' => $matter->id]);
++
++    return [$tenant, $user, $document];
++}
++
++function grantPermissionTo(User $user, Tenant $tenant, string $permission): void
++{
++    setPermissionsTeamId($tenant->id);
++    $user->givePermissionTo($permission);
++    app(PermissionRegistrar::class)->forgetCachedPermissions();
++}
++
++function policyArguments(string $method, Document $document): array
++{
++    return in_array($method, ['viewAny', 'create'], true) ? [Document::class] : [$document];
++}
++
++dataset('policyMethodPermission', [
++    'viewAny needs view documents' => ['viewAny', 'view documents'],
++    'view needs view documents' => ['view', 'view documents'],
++    'create needs create documents' => ['create', 'create documents'],
++    'update needs edit documents' => ['update', 'edit documents'],
++    'delete needs delete documents' => ['delete', 'delete documents'],
++    'review needs review documents' => ['review', 'review documents'],
++    'approve needs approve documents' => ['approve', 'approve documents'],
++    'annotate needs edit documents' => ['annotate', 'edit documents'],
++    'assignReviewer needs manage users' => ['assignReviewer', 'manage users'],
++    'comment needs edit documents' => ['comment', 'edit documents'],
++    'moderateComments needs approve documents' => ['moderateComments', 'approve documents'],
++]);
++
++test('grants when user holds the required permission', function (string $method, string $permission): void {
++    [$tenant, $user, $document] = policyFixtures();
++    grantPermissionTo($user, $tenant, $permission);
++
++    expect(Gate::forUser($user)->allows($method, policyArguments($method, $document)))->toBeTrue();
++})->with('policyMethodPermission');
++
++test('denies when user lacks the required permission', function (string $method, string $permission): void {
++    [, $user, $document] = policyFixtures();
++
++    expect(Gate::forUser($user)->allows($method, policyArguments($method, $document)))->toBeFalse();
++})->with('policyMethodPermission');
++
++test('superadmin bypasses every DocumentPolicy gate without explicit permissions', function (): void {
++    [$tenant, $user, $document] = policyFixtures();
++    setPermissionsTeamId($tenant->id);
++    $user->assignRole('super-admin');
++
++    $methods = [
++        'viewAny', 'view', 'create', 'update', 'delete',
++        'review', 'approve', 'annotate', 'assignReviewer',
++        'comment', 'moderateComments',
++    ];
++
++    foreach ($methods as $method) {
++        expect(Gate::forUser($user)->allows($method, policyArguments($method, $document)))
++            ->toBeTrue("Gate::before superadmin bypass failed for DocumentPolicy::{$method}");
++    }
++});
+diff --git a/tests/Feature/SuperadminBypassTest.php b/tests/Feature/SuperadminBypassTest.php
+new file mode 100644
+index 0000000..96fb913
+--- /dev/null
++++ b/tests/Feature/SuperadminBypassTest.php
+@@ -0,0 +1,107 @@
++<?php
++
++declare(strict_types=1);
++
++use App\Models\Client;
++use App\Models\Document;
++use App\Models\Matter;
++use App\Models\Tenant;
++use App\Models\User;
++use Database\Seeders\RolesAndPermissionsSeeder;
++use Inertia\Testing\AssertableInertia as Assert;
++use Spatie\Permission\Models\Permission;
++use Spatie\Permission\PermissionRegistrar;
++
++beforeEach(function (): void {
++    (new RolesAndPermissionsSeeder)->run();
++    app(PermissionRegistrar::class)->forgetCachedPermissions();
++});
++
++afterEach(function (): void {
++    setPermissionsTeamId(null);
++    tenancy()->end();
++});
++
++function makeSuperAdmin(Tenant $assignmentTenant): User
++{
++    $user = User::factory()->create();
++
++    setPermissionsTeamId($assignmentTenant->id);
++    $user->assignRole('super-admin');
++    setPermissionsTeamId(null);
++
++    return $user;
++}
++
++test('superadmin auth.permissions payload contains every database permission', function (): void {
++    $tenant = Tenant::factory()->create();
++    $superAdmin = makeSuperAdmin($tenant);
++    $allPermissionNames = Permission::query()->pluck('name')->all();
++
++    $this->actingAs($superAdmin)
++        ->withSession(['active_tenant_id' => $tenant->id])
++        ->get(route('dashboard'))
++        ->assertOk()
++        ->assertInertia(fn (Assert $page) => $page
++            ->where('auth.isSuperAdmin', true)
++            ->where('auth.permissions', $allPermissionNames)
++        );
++});
++
++test('superadmin auth.permissions remains complete after switching active tenant session', function (): void {
++    $assignmentTenant = Tenant::factory()->create();
++    $otherTenant = Tenant::factory()->create();
++    $superAdmin = makeSuperAdmin($assignmentTenant);
++    $allPermissionNames = Permission::query()->pluck('name')->all();
++
++    $this->actingAs($superAdmin)
++        ->withSession(['active_tenant_id' => $otherTenant->id])
++        ->get(route('dashboard'))
++        ->assertOk()
++        ->assertInertia(fn (Assert $page) => $page->where('auth.permissions', $allPermissionNames));
++});
++
++test('tenant-admin auth.permissions count matches the seeder declared set', function (): void {
++    $tenant = Tenant::factory()->create();
++    $user = User::factory()->forTenant($tenant)->create();
++    setPermissionsTeamId($tenant->id);
++    $user->assignRole('tenant-admin');
++    setPermissionsTeamId(null);
++
++    $this->actingAs($user)
++        ->get(route('dashboard'))
++        ->assertOk()
++        ->assertInertia(fn (Assert $page) => $page->has('auth.permissions', 16));
++});
++
++test('superadmin can view a document after switching active tenant to its owner', function (): void {
++    $assignmentTenant = Tenant::factory()->create();
++    $superAdmin = makeSuperAdmin($assignmentTenant);
++
++    $documentTenant = Tenant::factory()->create();
++    $client = Client::factory()->create(['tenant_id' => $documentTenant->id]);
++    $matter = Matter::factory()->create(['tenant_id' => $documentTenant->id, 'client_id' => $client->id]);
++    $document = Document::factory()->create(['tenant_id' => $documentTenant->id, 'matter_id' => $matter->id]);
++
++    $this->actingAs($superAdmin)
++        ->withSession(['active_tenant_id' => $documentTenant->id])
++        ->get(route('documents.show', $document))
++        ->assertSuccessful();
++});
++
++test('regular partner cannot view a document belonging to a foreign tenant', function (): void {
++    $tenant = Tenant::factory()->create();
++    $partner = User::factory()->forTenant($tenant)->create();
++    setPermissionsTeamId($tenant->id);
++    $partner->assignRole('partner');
++    setPermissionsTeamId(null);
++
++    $foreignTenant = Tenant::factory()->create();
++    $foreignClient = Client::factory()->create(['tenant_id' => $foreignTenant->id]);
++    $foreignMatter = Matter::factory()->create(['tenant_id' => $foreignTenant->id, 'client_id' => $foreignClient->id]);
++    $foreignDocument = Document::factory()->create(['tenant_id' => $foreignTenant->id, 'matter_id' => $foreignMatter->id]);
++
++    $this->actingAs($partner)
++        ->get(route('documents.show', $foreignDocument))
++        ->assertNotFound();
++});
+diff --git a/tests/Feature/Tenancy/TenantScopingTest.php b/tests/Feature/Tenancy/TenantScopingTest.php
+index d34ab97..bf03680 100644
+--- a/tests/Feature/Tenancy/TenantScopingTest.php
++++ b/tests/Feature/Tenancy/TenantScopingTest.php
+@@ -32,6 +32,26 @@ function createTenantUserWithRole(string $role = 'tenant-admin'): array
+     return [$tenant, $user];
+ }
+ 
++function makeForeignTenantDocument(): Document
++{
++    $tenant = Tenant::factory()->create();
++    $client = Client::factory()->create(['tenant_id' => $tenant->id]);
++    $matter = Matter::factory()->create(['tenant_id' => $tenant->id, 'client_id' => $client->id]);
++
++    return Document::factory()->create(['tenant_id' => $tenant->id, 'matter_id' => $matter->id]);
++}
++
++function makeForeignTenantDocumentWithComment(): array
++{
++    $document = makeForeignTenantDocument();
++    $comment = \App\Models\DocumentComment::factory()->create([
++        'tenant_id' => $document->tenant_id,
++        'document_id' => $document->id,
++    ]);
++
++    return [$document, $comment];
++}
++
+ test('clients index only returns records for the authenticated users tenant', function (): void {
+     [$tenant, $user] = createTenantUserWithRole();
+     $otherTenant = Tenant::factory()->create();
+@@ -233,3 +253,34 @@ function createTenantUserWithRole(string $role = 'tenant-admin'): array
+         ->delete(route('documents.annotations.destroy', [$tenantBDocument, $tenantBAnnotation]))
+         ->assertNotFound();
+ });
++
++test('comment store route denies cross tenant access', function (): void {
++    [, $userA] = createTenantUserWithRole();
++    $foreignDocument = makeForeignTenantDocument();
++
++    $this->actingAs($userA)
++        ->postJson(route('documents.comments.store', $foreignDocument), [
++            'body' => 'Should never persist.',
++        ])
++        ->assertNotFound();
++});
++
++test('comment update route denies cross tenant access', function (): void {
++    [, $userA] = createTenantUserWithRole();
++    [$foreignDocument, $foreignComment] = makeForeignTenantDocumentWithComment();
++
++    $this->actingAs($userA)
++        ->patchJson(route('documents.comments.update', [$foreignDocument, $foreignComment]), [
++            'body' => 'Should never apply.',
++        ])
++        ->assertNotFound();
++});
++
++test('comment destroy route denies cross tenant access', function (): void {
++    [, $userA] = createTenantUserWithRole();
++    [$foreignDocument, $foreignComment] = makeForeignTenantDocumentWithComment();
++
++    $this->actingAs($userA)
++        ->deleteJson(route('documents.comments.destroy', [$foreignDocument, $foreignComment]))
++        ->assertNotFound();
++});

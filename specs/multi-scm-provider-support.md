@@ -61,7 +61,7 @@ The current codebase is Bitbucket-shaped at every layer: `app/Services/Bitbucket
 - `App\Enums\ScmProvider` backed string enum (`bitbucket_cloud`, `github_cloud`).
 - Schema migrations (see §7) — 3 migrations, one per affected table.
 - `App\Http\Controllers\Scm\Github\InstallController` (start + callback actions).
-- `App\Services\Scm\Github\StateTokenSigner` (HMAC-signed state token with 10-min TTL, single-use nonce via cache).
+- Session-backed install marker: `start()` stashes `{workspace_id, expires_at}` in the user's session under key `scm_github_install`, consumed (single-use) by `callback()` via `session()->pull(...)`. No signed state token is needed because GitHub's Setup URL flow (which we use, see FR-02) does not preserve a custom `state` query param.
 - `App\Http\Controllers\Github\WebhookController` (HMAC-256 + idempotency + dispatch; also handles `installation.deleted`).
 - `App\Services\Webhook\WebhookIngestionPipeline` (shared by BB and GH controllers post-validation).
 - `App\Services\Scm\Github\GithubInstallationManager` (handles uninstall: nullify ID, mark unhealthy, disable repos).
@@ -112,10 +112,10 @@ Admin logs in → "Workspaces" → "+ New" form (now with `scm_provider` radio: 
 - `UpdateWorkspaceRequest::rules()` does not list `scm_provider`; an unauthorized attempt is caught at validation, not silently dropped.
 
 **FR-02 — GitHub App install flow**
-- `POST /scm/github/install/start` (auth: workspace admin) builds a signed state token containing `{workspace_id, expires_at, nonce}` (HMAC-SHA256 with `APP_KEY`-derived secret, 10-minute TTL, nonce stored in cache for single-use).
-- Response is a 302 redirect to `https://github.com/apps/{GITHUB_APP_SLUG}/installations/new?state={token}`.
-- `GET /scm/github/install/callback` validates state token signature, expiry, and nonce consumption; on success persists `installation_id` to the Workspace identified by the token's `workspace_id` claim, calls `GithubDriver::verifyCredentials()`, marks `health=healthy`.
-- Callback rejects: invalid signature → 403; expired or replayed nonce → 403; `installation_id` already on another Workspace → 409 with explanatory body.
+- `POST /scm/github/install/start` (auth: workspace admin) stashes `{workspace_id, expires_at}` (10-minute TTL) in the admin's session under key `scm_github_install`.
+- Response is a 302 redirect to `https://github.com/apps/{GITHUB_APP_SLUG}/installations/new`. The GitHub App is configured with **Setup URL** pointing to the callback below, which is where GitHub will send the admin's browser after a successful install (carrying `installation_id` and `setup_action`).
+- `GET /scm/github/install/callback` is the configured Setup URL. It consumes the session marker (`session()->pull('scm_github_install')`), validates `expires_at`, persists `installation_id` to the Workspace identified by the marker's `workspace_id`, calls `GithubDriver::verifyCredentials()`, marks `health=healthy`.
+- Callback rejects: missing session marker (no `start()` preceded this hit) → 403; expired marker → 403; `installation_id` already on another Workspace → 409 with explanatory body. The marker is consumed atomically by `pull`, so a replayed callback request (same browser, refreshed) returns 403 because the second read finds no marker.
 - `setup_action=install` is the happy path; `setup_action=update` triggers a `listRepositories` re-sync only, no mapping change.
 - User account installations (`account.type=User` on GH side) are accepted without 422; downstream code does not distinguish.
 
@@ -166,7 +166,7 @@ Admin logs in → "Workspaces" → "+ New" form (now with `scm_provider` radio: 
 ### 5.2. Error and edge cases
 - Workspace `github_cloud` without `github_installation_id` populated (callback never completed): `verifyCredentials` returns invalid; admin sees "complete connection" CTA; no `ReviewPullRequestJob` dispatches because no webhook arrives.
 - `installation_id` in callback already on another Workspace: 409 conflict; original mapping untouched; current Workspace remains unconnected; admin instructed to uninstall on GH first or use the existing Workspace.
-- Replayed state token (single-use nonce already consumed): 403.
+- Replayed callback (session marker already consumed by an earlier successful or failing callback): 403.
 - GH App's `webhook_secret` rotated: env reload required; in-flight webhooks during rotation may fail HMAC (acceptable — operational note).
 - `pull_request` action other than `opened`: 202, no dispatch (`synchronize` etc. are backlog v0.2).
 - Force-push between dispatch and job execution: same posture as BB (delivery + dispatch happen at receive time).
@@ -178,7 +178,7 @@ Admin logs in → "Workspaces" → "+ New" form (now with `scm_provider` radio: 
 
 - **Reliability**: 5xx responses to GitHub cause GH to retry under its own backoff (mirrors BB at-least-once posture).
 - **Performance**: webhook handler completes in <300ms p95 on both providers (DB insert + unique check + queue push).
-- **Security**: HMAC primary auth on both providers, `hash_equals` timing-safe; state token HMAC-signed with single-use nonce; GH App private key only in env, never DB-persisted.
+- **Security**: HMAC primary auth on both providers, `hash_equals` timing-safe; GH install flow uses a session-backed, single-use, time-bounded marker (10-min TTL, consumed via `session()->pull`); GH App private key only in env, never DB-persisted.
 - **State token TTL**: 10 minutes — long enough for admin to complete install on GH UI, short enough to bound CSRF window.
 - **Observability**: every GH API call logs to a structured channel; rate-limit headers (`X-RateLimit-Remaining`, `X-RateLimit-Reset`) captured per call.
 - **Compatibility**: no behavioural change to existing Bitbucket Workspaces beyond renamed columns and class names; the 113 Phase 2 Pest tests pass without semantic edits (only import paths and column references update).
@@ -274,7 +274,6 @@ app/Services/Scm/
 ├── Github/
 │   ├── JwtSigner.php
 │   ├── InstallationTokenCache.php
-│   ├── StateTokenSigner.php
 │   └── GithubInstallationManager.php
 ├── BitbucketDriver.php
 ├── GithubDriver.php
@@ -314,7 +313,7 @@ app/Services/Scm/
 - **AC28** — `scm_provider` is immutable after creation; `PATCH /workspaces/{slug}` with `scm_provider` in payload → 422. Test: `WorkspaceControllerTest`.
 
 **Connect — GitHub App install flow (4)**
-- **AC29** — `POST /scm/github/install/start` returns 302 redirect to `github.com/apps/{slug}/installations/new?state={token}`; the state token is HMAC-SHA256-signed with `APP_KEY` secret, carries `{workspace_id, exp}`, expires in 10 minutes, and consumes its nonce on first valid callback. Test: `Github/InstallControllerTest`.
+- **AC29** — `POST /scm/github/install/start` returns 302 redirect to `github.com/apps/{slug}/installations/new` (no `?state=`) and stashes `{workspace_id, expires_at}` in the session under key `scm_github_install` with a 10-minute TTL. The marker is single-use — consumed atomically by `session()->pull()` on the first callback hit. Test: `Github/InstallControllerTest`.
 - **AC30** — `GET /scm/github/install/callback` with valid state + `installation_id` persists `installation_id` on the matching Workspace, calls `verifyCredentials()`, marks `health=healthy`. Includes the case of a user-account installation (`account.type=User` accepted without 422). Test: `Github/InstallControllerTest`.
 - **AC31** — Callback with invalid signature / expired token / replayed nonce → 403; no `installation_id` persisted. Test: `Github/InstallControllerTest`.
 - **AC32** — Callback with `installation_id` already mapped to another Workspace → 409; original mapping preserved; current Workspace stays unconnected. Test: `Github/InstallControllerTest`.

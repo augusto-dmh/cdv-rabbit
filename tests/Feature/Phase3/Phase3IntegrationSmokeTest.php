@@ -20,6 +20,7 @@ use App\Services\Review\CostReservationInterface;
 use App\Support\AnthropicHeaderBag;
 use Illuminate\Support\Facades\Http;
 use Tests\Fakes\FakeCostReservation;
+use Tests\Fakes\StubsV2LlmDriverMethods;
 
 /**
  * Phase 3 cross-cutting integration smoke test.
@@ -82,6 +83,8 @@ test('Phase3 smoke: 3-file PR — binary + lock skipped, normal file reviewed', 
     $llmCallCount = 0;
     app()->bind(LlmDriverInterface::class, fn () => new class($llmCallCount) implements LlmDriverInterface
     {
+        use StubsV2LlmDriverMethods;
+
         public function __construct(private int &$count) {}
 
         public function getSystemPrompt(): string

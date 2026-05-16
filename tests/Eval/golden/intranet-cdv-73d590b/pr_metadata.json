@@ -1,0 +1,13 @@
+{
+    "fixture_id": "intranet-cdv-73d590b",
+    "source_repo": "intranet-cdv (private bitbucket)",
+    "commit_sha": "73d590b3005e2204c4345352b942887c5ec2bd3b",
+    "title": "fix: show consolidated FGC / Crédito Privado exposure regardless of account selection",
+    "branch": "fix/table-fgc-consolidated",
+    "base": "08dc5c52f",
+    "author": "Felipe Silva Ganho",
+    "file_count": 7,
+    "additions": 91,
+    "deletions": 25,
+    "captured_from": "git diff 73d590b30^..73d590b30 in /home/augusto/projects/intranet-cdv"
+}

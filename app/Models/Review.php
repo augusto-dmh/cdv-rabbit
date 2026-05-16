@@ -35,6 +35,7 @@ class Review extends Model
         'secrets_redacted',
         'error_class',
         'error_message',
+        'status_check_state',
     ];
 
     protected function casts(): array

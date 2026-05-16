@@ -1,0 +1,13 @@
+{
+    "fixture_id": "cdv-rabbit-1dec69a",
+    "source_repo": "augusto-dmh/cdv-rabbit",
+    "commit_sha": "1dec69a9cceee0533e19d01d44af021332536dc5",
+    "title": "fix(llm): normalize OpenAI rate-limit reset header into ISO-8601 timestamp",
+    "branch": "main",
+    "base": "5dd2f70",
+    "author": "augusto-dmh",
+    "file_count": 1,
+    "additions": 36,
+    "deletions": 1,
+    "captured_from": "git diff 1dec69a^..1dec69a in /home/augusto/projects/cdv-rabbit"
+}

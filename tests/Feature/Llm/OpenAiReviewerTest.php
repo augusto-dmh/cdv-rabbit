@@ -43,7 +43,7 @@ function fakeOpenAiReviewResponse(): array
 
 it('AC27: returns a ReviewResultDto on happy path', function (): void {
     OpenAiReviewAgent::fake(function ($prompt) {
-        return json_encode(fakeOpenAiReviewResponse());
+        return fakeOpenAiReviewResponse();
     });
 
     app()->instance(OpenAiHeaderBag::class, new OpenAiHeaderBag(
@@ -73,7 +73,7 @@ it('AC28: pre-redacted diff does not contain raw secrets when passed to OpenAI',
     OpenAiReviewAgent::fake(function ($prompt) use (&$capturedPrompt) {
         $capturedPrompt = $prompt;
 
-        return json_encode(fakeOpenAiReviewResponse());
+        return fakeOpenAiReviewResponse();
     });
 
     app()->instance(OpenAiHeaderBag::class, new OpenAiHeaderBag(requestId: 'openai-req-redact'));
@@ -174,10 +174,10 @@ it('AC31: reviewer passes all LLM comments through (cap is enforced by CommentPo
     }
 
     OpenAiReviewAgent::fake(function ($prompt) use ($comments) {
-        return json_encode([
+        return [
             'summary' => ['overview' => 'Many issues.', 'risk_level' => 'high'],
             'comments' => $comments,
-        ]);
+        ];
     });
 
     app()->instance(OpenAiHeaderBag::class, new OpenAiHeaderBag(requestId: 'openai-req-cap'));
@@ -192,7 +192,7 @@ it('AC31: reviewer passes all LLM comments through (cap is enforced by CommentPo
 // ---------------------------------------------------------------------------
 
 it('records duration_ms as a non-negative integer', function (): void {
-    OpenAiReviewAgent::fake(fn ($prompt) => json_encode(fakeOpenAiReviewResponse()));
+    OpenAiReviewAgent::fake(fn ($prompt) => fakeOpenAiReviewResponse());
 
     app()->instance(OpenAiHeaderBag::class, new OpenAiHeaderBag(requestId: 'openai-req-dur'));
 

@@ -1,0 +1,158 @@
+diff --git a/tests/Feature/Scm/Phase6AcMatrixTest.php b/tests/Feature/Scm/Phase6AcMatrixTest.php
+new file mode 100644
+index 0000000..c705186
+--- /dev/null
++++ b/tests/Feature/Scm/Phase6AcMatrixTest.php
+@@ -0,0 +1,58 @@
++<?php
++
++declare(strict_types=1);
++
++/**
++ * Phase 6 / Multi-SCM Provider Support verifier. Asserts that every new
++ * Acceptance Criterion (AC27..AC38) is covered by at least one named test
++ * elsewhere in the suite. The check is grep-based against the test source
++ * tree so this stays decoupled from runtime fixtures.
++ */
++function scanForAc(string $marker): array
++{
++    $hits = [];
++    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator(base_path('tests')));
++
++    /** @var SplFileInfo $file */
++    foreach ($iterator as $file) {
++        if (! $file->isFile() || $file->getExtension() !== 'php') {
++            continue;
++        }
++
++        $contents = (string) file_get_contents($file->getPathname());
++        if (str_contains($contents, $marker)) {
++            $hits[] = str_replace(base_path().'/', '', $file->getPathname());
++        }
++    }
++
++    return $hits;
++}
++
++dataset('phase6_acs', [
++    'AC27' => ['AC27'],
++    'AC28' => ['AC28'],
++    'AC29' => ['AC29'],
++    'AC30' => ['AC30'],
++    'AC31' => ['AC31'],
++    'AC32' => ['AC32'],
++    'AC33' => ['AC33'],
++    'AC34' => ['AC34'],
++    'AC35' => ['AC35'],
++    'AC36' => ['AC36'],
++    'AC37' => ['AC37'],
++    'AC38' => ['AC38'],
++]);
++
++test('Phase 6 AC is covered by at least one named test', function (string $ac): void {
++    $hits = scanForAc("{$ac}:");
++
++    // Allow either "AC37:" prose form or "AC37 " label.
++    if ($hits === []) {
++        $hits = scanForAc("({$ac} ");
++    }
++    if ($hits === []) {
++        $hits = scanForAc("{$ac} arch");
++    }
++
++    expect($hits)->not->toBeEmpty("Phase 6 {$ac} has no test referencing it.");
++})->with('phase6_acs');
+diff --git a/tests/Unit/Services/Scm/ScmArchTest.php b/tests/Unit/Services/Scm/ScmArchTest.php
+new file mode 100644
+index 0000000..dabd1a1
+--- /dev/null
++++ b/tests/Unit/Services/Scm/ScmArchTest.php
+@@ -0,0 +1,88 @@
++<?php
++
++declare(strict_types=1);
++
++use App\Services\Scm\BitbucketDriver;
++use App\Services\Scm\Contracts\ScmDriverInterface;
++use App\Services\Scm\Dto\CommentHandle;
++use App\Services\Scm\Dto\CredentialCheck;
++use App\Services\Scm\Dto\FileChangeDto;
++use App\Services\Scm\Dto\InlineCommentPayload;
++use App\Services\Scm\Dto\PullRequestDto;
++use App\Services\Scm\Dto\RepositoryDto;
++use App\Services\Scm\Dto\WebhookHandle;
++use App\Services\Scm\Exceptions\UnsupportedScmProviderException;
++use App\Services\Scm\GithubDriver;
++
++test('all SCM drivers implement ScmDriverInterface (AC37 arch)', function (): void {
++    expect(class_implements(BitbucketDriver::class))->toContain(ScmDriverInterface::class);
++    expect(class_implements(GithubDriver::class))->toContain(ScmDriverInterface::class);
++});
++
++test('all SCM DTOs are final readonly classes', function (): void {
++    $dtos = [
++        RepositoryDto::class,
++        PullRequestDto::class,
++        FileChangeDto::class,
++        InlineCommentPayload::class,
++        CommentHandle::class,
++        WebhookHandle::class,
++        CredentialCheck::class,
++    ];
++
++    foreach ($dtos as $dto) {
++        $reflection = new ReflectionClass($dto);
++        expect($reflection->isFinal())->toBeTrue("$dto must be final");
++        expect($reflection->isReadOnly())->toBeTrue("$dto must be readonly");
++    }
++});
++
++test('UnsupportedScmProviderException extends RuntimeException', function (): void {
++    expect(is_subclass_of(UnsupportedScmProviderException::class, RuntimeException::class))->toBeTrue();
++});
++
++test('AC38: ReviewPullRequestJob is provider-agnostic (no provider-specific branching)', function (): void {
++    $source = (string) file_get_contents(app_path('Jobs/ReviewPullRequestJob.php'));
++
++    // The job must never reference a concrete provider driver, a workspace.scm_provider value,
++    // or any provider literal — it must talk only to ScmDriverInterface via the factory.
++    expect($source)->not->toContain('scm_provider')
++        ->and($source)->not->toContain('bitbucket_cloud')
++        ->and($source)->not->toContain('github_cloud')
++        ->and($source)->not->toContain('BitbucketDriver')
++        ->and($source)->not->toContain('GithubDriver');
++});
++
++test('AC38: CommentPoster is provider-agnostic', function (): void {
++    $source = (string) file_get_contents(app_path('Services/Review/CommentPoster.php'));
++
++    expect($source)->not->toContain('scm_provider')
++        ->and($source)->not->toContain('bitbucket_cloud')
++        ->and($source)->not->toContain('github_cloud')
++        ->and($source)->not->toContain('BitbucketDriver')
++        ->and($source)->not->toContain('GithubDriver');
++});
++
++test('app/Services/Bitbucket/ directory was removed (W6-T3 cleanup)', function (): void {
++    expect(is_dir(app_path('Services/Bitbucket')))->toBeFalse();
++});
++
++test('ScmDriverInterface declares exactly the 11 contract methods', function (): void {
++    $reflection = new ReflectionClass(ScmDriverInterface::class);
++    $methods = array_map(fn ($m) => $m->getName(), $reflection->getMethods());
++
++    sort($methods);
++    expect($methods)->toBe([
++        'deleteWebhook',
++        'getChangedFiles',
++        'getDiff',
++        'getPullRequest',
++        'getRepository',
++        'listRepositories',
++        'postInlineComment',
++        'postPullRequestComment',
++        'registerWebhook',
++        'updateComment',
++        'verifyCredentials',
++    ]);
++});

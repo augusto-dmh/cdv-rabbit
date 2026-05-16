@@ -1,0 +1,13 @@
+{
+    "fixture_id": "docint-pr-29",
+    "source_repo": "augusto-dmh/DocInt",
+    "pr_number": 29,
+    "title": "test: pin architectural seams — tenant, superadmin, policy, arch rules",
+    "branch": "test/architectural-seams",
+    "base": "main",
+    "author": "augusto-dmh",
+    "file_count": 4,
+    "additions": 290,
+    "deletions": 0,
+    "captured_from": "git diff 9aae890^..43b23f2 in /home/augusto/projects/DocInt-rabbit-test-2"
+}

@@ -48,6 +48,8 @@ from migration 0001.
    - `tenancy-and-workspace-isolation.md` (Phase 1)
    - `lgpd-data-protection-posture.md` (Phase 1 + 3)
    - `bitbucket-cloud-integration.md` (Phase 2)
+   - `github-cloud-integration.md` (Phase 6)
+   - `multi-scm-provider-support.md` (Phase 6)
    - `ai-code-review-pipeline.md` (Phase 3)
    - `cost-management-and-ceiling-alerts.md` (Phase 3)
    - `review-dashboard.md` (Phase 4)
@@ -55,6 +57,7 @@ from migration 0001.
    - `observability-and-structured-logs.md` (Phase 5)
    - `health-and-readiness-checks.md` (Phase 5)
    - `lgpd-compliance-tooling.md` (Phase 5)
+   - `review-pipeline-v2.md` (Phase 7)
 4. **`.omc/plans/cdv-rabbit-mvp-minimal.md`** — authoritative plan,
    v1.4, APPROVED WITH MINOR REVISIONS by two Critic passes. Read in
    full when planning or implementing. Especially:
@@ -98,12 +101,35 @@ cdv-rabbit gained GitHub Cloud as a second SCM Provider alongside Bitbucket Clou
 | W6-T3 | BitbucketClient → BitbucketDriver (DTOs); call sites rewired | `f09e8fb` |
 | W6-T4 | GithubDriver + JwtSigner (RS256 native) + InstallationTokenCache | `9efd470` |
 | W6-T5 | Github/WebhookController + WebhookIngestionPipeline + uninstall | `19d2df8` |
-| W6-T6 | Scm/Github/InstallController + StateTokenSigner + AC27/AC28 | `a60debb` |
+| W6-T6 | Scm/Github/InstallController (session-based) + AC27/AC28 | `a60debb` |
 | W6-T7 | Phase 6 verifier — arch invariants + AC matrix scanner | `1630399` |
 
 Phase 6 verifier: 397 tests, 1199 assertions, all green. The 113 Phase 2 BB tests still pass after the rename + DTO reshape.
 
 **Production gating** (operational, NOT code): GitHub App "cdv-rabbit-bot" registered at github.com/settings/apps with `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_WEBHOOK_SECRET`, `GITHUB_APP_SLUG` populated in env; GitHub DPA signed and `GITHUB_DPA_URL` populated (LGPD check #10).
+
+### Phase 7 — Review Pipeline v2 — ✅ CODE COMPLETE (awaiting ops gates; real-world validated on DocInt PR #36 + #37)
+
+v1 review pipeline has a silence bias: DocInt PR #35 (8 files, 233/-110, 3 orthogonal refactors) returned zero Findings. Phase 7 replaces the stance from "prefer silence" to high-recall structured output modeled on CodeRabbit (Walkthrough + tiered Findings + collapsed Nitpicks — see CONTEXT.md glossary). Schema bumps to `review_result_v2.json` (OpenAI-strict intersection) alongside v1; `workspaces.review_schema_version` enum gates per-Workspace rollout. Pipeline becomes two-call draft → critique (same-provider); only critic-approved Findings reach `CommentPoster`. Quality gated by `rabbit:eval` with 10 golden PRs and cross-provider LLM-judge. Source of truth: `specs/review-pipeline-v2.md`. Design decisions: `docs/adr/0005-review-pipeline-v2-recall-stance-and-critique-pass.md`. Plan: `.omc/plans/cdv-rabbit-review-pipeline-v2.md`. New ACs: AC39..AC51 (AC51 added post-grill for the auto-merge / status-check gate — see plan §6.1 — because consumer repos like DocInt have auto-merge enabled and v2's ~75s p95 latency would otherwise put reviews after the merge).
+
+#### W7 task graph + status
+
+| ID | Title | Commit |
+|---|---|---|
+| W7-T1 | Eval harness: 10 golden PRs + `rabbit:eval` + cross-provider LLM-judge | `ca5d48c` |
+| W7-T2 | `review_result_v2.json` schema + `workspaces.review_schema_version` migration | `f5de85c` |
+| W7-T3 | `review_v2.txt` prompt with 5+2 Laravel few-shot exemplars | `ede6fb3` |
+| W7-T4 | `LlmDriverInterface::critiqueDraft()` on both drivers + `CommentPoster` v2 filter | `5b494b2` |
+| W7-T5 | Per-Workspace v2 rollout + production telemetry + `rabbit:eval` CI gate | `9130588` |
+
+**Sequence constraint (ADR 0005):** W7-T1 shipped first; W7-T2 and W7-T3 depend on green eval baseline; W7-T4 depends on W7-T2 + W7-T3; W7-T5 depends on W7-T4.
+
+**Post-implementation reconciliation** (real-world dry-runs against DocInt PR #36 + #37 surfaced three production-blocking bugs the test fakes missed; all fixed on the branch and reflected in `specs/review-pipeline-v2.md` §15 v1.2 change-log):
+- `a497602 fix(v2): nullable-union schema translation + widen reviews_llm_calls.role` — OpenAi-strict intersection schema crashed the SDK type-translator; SQLite CHECK constraint on the role column rejected `draft`/`critique` despite the W7-T4 no-op migration.
+- `f8082b5 fix(v2): SCM-422 fallback` — inline-comment 422 now folds the Finding into a `<details>` summary block rather than crashing the review.
+- `653c261 fix(v2): line-number annotation + DiffPositionResolver` — `PromptBuilder` annotates every `+` line with its absolute head-side number; `DiffPositionResolver` snaps namespace-cased paths to filesystem case and snaps lines within ±5. Findings now anchor inline.
+
+**Production gating** (operational, NOT code): live `rabbit:eval --schema=v2` baseline run (needs API budget); per-Workspace v2 pilot (1-week observation); DPO sign-off on cost delta; branch-protection rule on consumer repos requiring `cdv-rabbit/review` status check.
 
 ### W1 task graph + status (all complete)
 
@@ -223,6 +249,7 @@ rationale lives in plan §3.0.
 | **HMAC webhook auth (per-provider, asymmetric)** | Bitbucket: primary auth is `X-Hub-Signature` HMAC-SHA256 with `hash_equals` against the per-Workspace `webhook_secret`; URL token (`repositories.webhook_token`) is defense-in-depth. GitHub: primary auth is `X-Hub-Signature-256` HMAC-SHA256 against the per-App `GITHUB_APP_WEBHOOK_SECRET` env value; no URL token. Both controllers reject missing/mismatched signatures with 401 before any DB write or dispatch. | Plan §3.0 + AC19 + AC33 + AC34 + ADR 0003 |
 | **Atomic cost ceiling** | Per-workspace daily token ceiling enforced via Redis Lua `INCRBY`. No TOCTOU race. | Closes v1.0 M1 |
 | **Comment cap + AI label** | Max 25 inline comments per PR, every comment prefixed `🤖 cdv-rabbit (AI generated):`. Kill switch can halt dispatch within 10 s (AC8). | Plan §3 Week 3 + AC5/AC6/AC8 |
+| **v2 prompt/schema gated by eval baseline** | v2 prompt (`review_v2.txt`), schema (`review_result_v2.json`), or critic changes do not merge without a positive delta (or no regression) vs the golden baseline from `rabbit:eval`. CI gate enforced by `.github/workflows/eval.yml` (job `golden-pr-eval`), which runs `./vendor/bin/pest --testsuite=Eval --filter='GoldenPrEvalTest'` against both Anthropic and OpenAI when the repo-scoped variable `RABBIT_EVAL_LIVE=1` and secrets `ANTHROPIC_API_KEY` + `OPENAI_API_KEY` are populated. Branch protection on `main` must require the `golden-pr-eval` check before merge. | Quality gate (ADR 0005, AC50) |
 
 ---
 

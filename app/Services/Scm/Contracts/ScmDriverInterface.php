@@ -40,4 +40,26 @@ interface ScmDriverInterface
 
     /** BB only: deletes the webhook. GitHub: no-op. */
     public function deleteWebhook(string $scmRepoId, ?WebhookHandle $handle): void;
+
+    /**
+     * Post a commit-status check on the given head SHA so consumer repos can gate
+     * auto-merge on cdv-rabbit's verdict (AC51).
+     *
+     * Same-provider only — Bitbucket maps to "build statuses"
+     * (POST /2.0/repositories/{owner}/{repo}/commit/{sha}/statuses/build),
+     * GitHub maps to "commit statuses"
+     * (POST /repos/{owner}/{repo}/statuses/{sha}). Both providers must implement
+     * this method; cross-provider posting is not supported.
+     *
+     * @param  string  $state  One of 'pending'|'success'|'failure'.
+     * @param  string  $context  Status context identifier (e.g. 'cdv-rabbit/review').
+     */
+    public function postCommitStatus(
+        string $scmRepoId,
+        string $headSha,
+        string $state,
+        string $context,
+        string $description,
+        ?string $targetUrl = null,
+    ): void;
 }

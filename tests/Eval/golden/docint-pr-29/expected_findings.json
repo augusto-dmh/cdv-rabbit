@@ -1,0 +1,31 @@
+{
+  "fixture_id": "docint-pr-29",
+  "pr_summary": "Test-only PR that pins existing architectural seams: a Pest arch test suite for policies/models/controllers/form-requests/env-usage/superadmin allowlist, a DocumentPolicy matrix over method×permission pairs, a SuperadminBypassTest covering Gate::before + tenant-switching, and three cross-tenant comment-route 404 assertions added to TenantScopingTest. 4 files / +290 / -0. No production code touched. Reviewer behaviour under test should be: produce 1-2 low-severity maintainability Findings at most and a Walkthrough that acknowledges this is test infrastructure.",
+  "expected_findings": [
+    {
+      "path": "tests/Feature/SuperadminBypassTest.php",
+      "line_range": [55, 75],
+      "severity": "low",
+      "category": "maintainability",
+      "rationale": "The 'tenant-admin auth.permissions count matches the seeder declared set' test hard-codes the expected count as 16. This couples the test to the current seeder content — adding/removing any permission in RolesAndPermissionsSeeder breaks this test without telling the maintainer which permission moved. Prefer asserting against a derived expectation (e.g. count of permissions the seeder explicitly assigns to tenant-admin) so the test stays correct as the permission set evolves.",
+      "must_find": false
+    },
+    {
+      "path": "tests/Architecture/ArchitecturalRulesTest.php",
+      "line_range": [34, 43],
+      "severity": "low",
+      "category": "maintainability",
+      "rationale": "The 'superadmin checks live in a reviewed allowlist' arch rule encodes the list of classes that may call hasSuperAdminRole inline. This is intentional (it is the allowlist), but it should be flagged for the Walkthrough: every future addition to the allowlist requires a code change to a test file, which is a friction point reviewers should know about. Not a defect — a documentation/walkthrough concern.",
+      "must_find": false
+    }
+  ],
+  "expected_walkthrough_mentions": [
+    "test-only PR",
+    "no production code changed",
+    "pins existing architectural seams",
+    "architecture rule suite",
+    "policy matrix",
+    "superadmin bypass coverage",
+    "cross-tenant 404 assertions"
+  ]
+}
