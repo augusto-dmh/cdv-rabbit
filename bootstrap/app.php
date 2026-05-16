@@ -16,6 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
         then: function (): void {
             Route::middleware('web')
                 ->group(base_path('routes/bitbucket.php'));
+            Route::middleware('web')
+                ->group(base_path('routes/scm/github.php'));
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {

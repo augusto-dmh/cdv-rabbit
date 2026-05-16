@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Bitbucket;
 
-use App\Enums\WebhookDeliveryStatus;
 use App\Http\Controllers\Controller;
-use App\Jobs\ReviewPullRequestJob;
 use App\Models\Repository;
-use App\Models\WebhookDelivery;
+use App\Services\Webhook\WebhookIngestionPipeline;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class WebhookController extends Controller
 {
-    public function __invoke(Request $request, Repository $repository, string $webhookToken): JsonResponse
-    {
+    public function __invoke(
+        Request $request,
+        Repository $repository,
+        string $webhookToken,
+        WebhookIngestionPipeline $pipeline,
+    ): JsonResponse {
         if (! hash_equals($repository->webhook_token, $webhookToken)) {
             abort(404);
         }
@@ -39,39 +40,24 @@ class WebhookController extends Controller
             return response()->json(['message' => 'event ignored'], 202);
         }
 
-        $hookUuid = $request->header('X-Hook-UUID', '');
-
-        if (WebhookDelivery::where('scm_delivery_id', $hookUuid)->exists()) {
-            return response()->json(['message' => 'duplicate'], 200);
-        }
+        $hookUuid = (string) $request->header('X-Hook-UUID', '');
 
         $payload = $request->json()->all();
-        $prNumber = $payload['pullrequest']['id'] ?? 0;
-        $headSha = $payload['pullrequest']['source']['commit']['hash'] ?? '';
+        $prNumber = (int) ($payload['pullrequest']['id'] ?? 0);
+        $headSha = (string) ($payload['pullrequest']['source']['commit']['hash'] ?? '');
 
-        $delivery = DB::transaction(function () use ($repository, $hookUuid, $eventKey, $prNumber, $headSha): WebhookDelivery {
-            $delivery = WebhookDelivery::create([
-                'scm_delivery_id' => $hookUuid,
-                'repository_id' => $repository->id,
-                'event_type' => $eventKey,
-                'status' => WebhookDeliveryStatus::Received,
-                'created_at' => now(),
-            ]);
+        $delivery = $pipeline->ingestPullRequestCreated(
+            $repository,
+            $hookUuid,
+            'bitbucket_cloud',
+            $prNumber,
+            $headSha,
+            $eventKey,
+        );
 
-            ReviewPullRequestJob::dispatch(
-                $repository->workspace_id,
-                $repository->id,
-                $prNumber,
-                $headSha,
-            );
-
-            $delivery->update([
-                'status' => WebhookDeliveryStatus::Dispatched,
-                'processed_at' => now(),
-            ]);
-
-            return $delivery;
-        });
+        if ($delivery === null) {
+            return response()->json(['message' => 'duplicate'], 200);
+        }
 
         return response()->json(['delivery_id' => $delivery->id], 202);
     }
