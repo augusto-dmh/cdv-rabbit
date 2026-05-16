@@ -1,0 +1,13 @@
+{
+    "fixture_id": "cdv-rabbit-19d2df8",
+    "source_repo": "augusto-dmh/cdv-rabbit",
+    "commit_sha": "19d2df8793833888ac92e8161430ded639b6bac2",
+    "title": "feat(scm): add Github WebhookController, shared WebhookIngestionPipeline and uninstall handler (W6-T5)",
+    "branch": "main",
+    "base": "9efd470",
+    "author": "augusto-dmh",
+    "file_count": 7,
+    "additions": 433,
+    "deletions": 36,
+    "captured_from": "git diff 19d2df8^..19d2df8 in /home/augusto/projects/cdv-rabbit"
+}

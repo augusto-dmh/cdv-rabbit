@@ -1,0 +1,13 @@
+{
+    "fixture_id": "cdv-rabbit-1630399",
+    "source_repo": "augusto-dmh/cdv-rabbit",
+    "commit_sha": "16303990ca3438b67773732c8acb9883766d2c5a",
+    "title": "test(scm): Phase 6 verifier — arch invariants + AC27..AC38 coverage matrix (W6-T7)",
+    "branch": "main",
+    "base": "a60debb",
+    "author": "augusto-dmh",
+    "file_count": 2,
+    "additions": 146,
+    "deletions": 0,
+    "captured_from": "git diff 1630399^..1630399 in /home/augusto/projects/cdv-rabbit"
+}
