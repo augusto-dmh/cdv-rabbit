@@ -1,0 +1,2331 @@
+diff --git a/app/Http/Controllers/BulkDocumentReviewController.php b/app/Http/Controllers/BulkDocumentReviewController.php
+new file mode 100644
+index 0000000..32689aa
+--- /dev/null
++++ b/app/Http/Controllers/BulkDocumentReviewController.php
+@@ -0,0 +1,65 @@
++<?php
++
++namespace App\Http\Controllers;
++
++use App\Enums\DocumentStatus;
++use App\Http\Requests\Documents\BulkAssignDocumentReviewerRequest;
++use App\Http\Requests\Documents\BulkReviewDocumentsRequest;
++use App\Models\User;
++use App\Services\Documents\DocumentBulkReviewService;
++use Illuminate\Http\JsonResponse;
++
++class BulkDocumentReviewController extends Controller
++{
++    public function __construct(
++        public readonly DocumentBulkReviewService $documentBulkReviewService,
++    ) {}
++
++    public function approve(BulkReviewDocumentsRequest $request): JsonResponse
++    {
++        /** @var User $actor */
++        $actor = $request->user();
++
++        return response()->json($this->documentBulkReviewService->performStatusTransition(
++            documentIds: $request->validated('document_ids'),
++            toStatus: DocumentStatus::Approved,
++            ability: 'approve',
++            authorizationVerb: 'approve',
++            successAction: 'approved',
++            actor: $actor,
++            ipAddress: $request->ip(),
++            userAgent: $request->userAgent(),
++        ));
++    }
++
++    public function reject(BulkReviewDocumentsRequest $request): JsonResponse
++    {
++        /** @var User $actor */
++        $actor = $request->user();
++
++        return response()->json($this->documentBulkReviewService->performStatusTransition(
++            documentIds: $request->validated('document_ids'),
++            toStatus: DocumentStatus::Rejected,
++            ability: 'review',
++            authorizationVerb: 'reject',
++            successAction: 'rejected',
++            actor: $actor,
++            ipAddress: $request->ip(),
++            userAgent: $request->userAgent(),
++        ));
++    }
++
++    public function assignReviewer(BulkAssignDocumentReviewerRequest $request): JsonResponse
++    {
++        /** @var User $actor */
++        $actor = $request->user();
++
++        return response()->json($this->documentBulkReviewService->performReviewerAssignment(
++            documentIds: $request->validated('document_ids'),
++            assignedTo: $request->validated('assigned_to'),
++            actor: $actor,
++            ipAddress: $request->ip(),
++            userAgent: $request->userAgent(),
++        ));
++    }
++}
+diff --git a/app/Http/Controllers/DocumentCommentController.php b/app/Http/Controllers/DocumentCommentController.php
+index 6448cbb..32d39b7 100644
+--- a/app/Http/Controllers/DocumentCommentController.php
++++ b/app/Http/Controllers/DocumentCommentController.php
+@@ -17,7 +17,6 @@ class DocumentCommentController extends Controller
+ {
+     public function index(Request $request, Document $document): JsonResponse
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('view', $document);
+ 
+         return response()->json([
+@@ -32,7 +31,6 @@ public function index(Request $request, Document $document): JsonResponse
+ 
+     public function store(StoreDocumentCommentRequest $request, Document $document): JsonResponse
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('view', $document);
+         $this->authorize('comment', $document);
+ 
+@@ -75,8 +73,6 @@ public function update(
+         Document $document,
+         DocumentComment $comment,
+     ): JsonResponse {
+-        $document = $this->ensureCurrentTenantDocument($document);
+-        $comment = $this->ensureCurrentTenantDocumentComment($document, $comment);
+         $this->authorize('view', $document);
+         $this->authorize('comment', $document);
+ 
+@@ -115,8 +111,6 @@ public function destroy(
+         Document $document,
+         DocumentComment $comment,
+     ): JsonResponse {
+-        $document = $this->ensureCurrentTenantDocument($document);
+-        $comment = $this->ensureCurrentTenantDocumentComment($document, $comment);
+         $this->authorize('view', $document);
+ 
+         /** @var User $user */
+@@ -156,26 +150,6 @@ public function destroy(
+         ]);
+     }
+ 
+-    protected function ensureCurrentTenantDocument(Document $document): Document
+-    {
+-        abort_unless($document->tenant_id === tenant()?->id, 404);
+-
+-        return $document;
+-    }
+-
+-    protected function ensureCurrentTenantDocumentComment(
+-        Document $document,
+-        DocumentComment $comment,
+-    ): DocumentComment {
+-        abort_unless(
+-            $comment->tenant_id === $document->tenant_id
+-                && $comment->document_id === $document->id,
+-            404,
+-        );
+-
+-        return $comment;
+-    }
+-
+     protected function resolveParentComment(mixed $parentId, Document $document): ?DocumentComment
+     {
+         if (! is_numeric($parentId)) {
+diff --git a/app/Http/Controllers/DocumentController.php b/app/Http/Controllers/DocumentController.php
+index 29a57c5..020403b 100644
+--- a/app/Http/Controllers/DocumentController.php
++++ b/app/Http/Controllers/DocumentController.php
+@@ -3,42 +3,38 @@
+ namespace App\Http\Controllers;
+ 
+ use App\Enums\DocumentStatus;
+-use App\Events\DocumentStatusUpdated;
+ use App\Http\Requests\Documents\AssignDocumentReviewerRequest;
+-use App\Http\Requests\Documents\BulkAssignDocumentReviewerRequest;
+-use App\Http\Requests\Documents\BulkReviewDocumentsRequest;
+ use App\Http\Requests\Documents\StoreDocumentRequest;
+ use App\Http\Requests\Documents\UpdateDocumentRequest;
+ use App\Models\AuditLog;
+ use App\Models\Document;
+ use App\Models\DocumentAnnotation;
+-use App\Models\DocumentClassification;
+ use App\Models\DocumentComment;
+-use App\Models\ExtractedData;
+ use App\Models\Matter;
+ use App\Models\ProcessingEvent;
+ use App\Models\User;
+-use App\Services\DocumentStatusTransitionService;
++use App\Services\Documents\DocumentManualReviewTransitioner;
++use App\Services\Documents\DocumentReviewerAssignmentService;
++use App\Services\Documents\DocumentShowPresenter;
+ use App\Services\DocumentUploadService;
+ use App\Support\DocumentExperienceGuardrails;
+ use App\Support\DocumentReviewWorkspacePresenter;
+-use Illuminate\Http\JsonResponse;
+ use Illuminate\Http\RedirectResponse;
+ use Illuminate\Http\Request;
+ use Illuminate\Support\Facades\Storage;
+ use Illuminate\Support\Str;
+-use Illuminate\Validation\ValidationException;
+ use Inertia\Inertia;
+ use Inertia\Response;
+-use InvalidArgumentException;
+ use Symfony\Component\HttpFoundation\HeaderUtils;
+ use Symfony\Component\HttpFoundation\StreamedResponse;
+ 
+ class DocumentController extends Controller
+ {
+     public function __construct(
+-        public DocumentUploadService $documentUploadService,
+-        public DocumentStatusTransitionService $documentStatusTransitionService,
++        public readonly DocumentUploadService $documentUploadService,
++        public readonly DocumentReviewerAssignmentService $documentReviewerAssignmentService,
++        public readonly DocumentManualReviewTransitioner $documentManualReviewTransitioner,
++        public readonly DocumentShowPresenter $documentShowPresenter,
+     ) {}
+ 
+     public function index(Request $request): Response
+@@ -52,7 +48,7 @@ public function index(Request $request): Response
+                 ->paginate(15),
+             'bulkReview' => fn (): array => [
+                 'availableReviewers' => $request->user()?->can('manage users')
+-                    ? $this->availableReviewersForTenant(tenant()?->id)
++                    ? $this->documentReviewerAssignmentService->availableReviewersForTenant(tenant()?->id)
+                     : [],
+                 'permissions' => [
+                     'canBulkApprove' => $request->user()?->can('approve documents') === true,
+@@ -66,7 +62,6 @@ public function index(Request $request): Response
+ 
+     public function create(Matter $matter): Response
+     {
+-        $matter = $this->ensureCurrentTenantMatter($matter);
+         $this->authorize('create', Document::class);
+ 
+         return Inertia::render('documents/Create', [
+@@ -77,7 +72,6 @@ public function create(Matter $matter): Response
+ 
+     public function store(StoreDocumentRequest $request, Matter $matter): RedirectResponse
+     {
+-        $matter = $this->ensureCurrentTenantMatter($matter);
+         $this->authorize('create', Document::class);
+ 
+         /** @var \Illuminate\Http\UploadedFile $file */
+@@ -98,7 +92,6 @@ public function store(StoreDocumentRequest $request, Matter $matter): RedirectRe
+ 
+     public function preview(Document $document): StreamedResponse
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('view', $document);
+ 
+         abort_unless(DocumentReviewWorkspacePresenter::supportsInlinePreview($document), 404);
+@@ -135,7 +128,6 @@ public function preview(Document $document): StreamedResponse
+ 
+     public function show(Request $request, Document $document): Response
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('view', $document);
+ 
+         if (! $this->isRealtimeRefresh($request)) {
+@@ -155,7 +147,7 @@ public function show(Request $request, Document $document): Response
+                 ->latest()
+                 ->limit(8)
+                 ->get()
+-                ->map(fn (ProcessingEvent $processingEvent): array => $this->formatProcessingEvent($processingEvent))
++                ->map(fn (ProcessingEvent $processingEvent): array => $this->documentShowPresenter->formatProcessingEvent($processingEvent))
+                 ->values(),
+             'reviewWorkspace' => fn (): array => [
+                 'preview' => DocumentReviewWorkspacePresenter::preview($document),
+@@ -175,7 +167,7 @@ public function show(Request $request, Document $document): Response
+                     ->map(fn (DocumentComment $comment): array => DocumentReviewWorkspacePresenter::comment($comment))
+                     ->values(),
+                 'availableReviewers' => $request->user()?->can('assignReviewer', $document) === true
+-                    ? $this->availableReviewersForAssignment($document)
++                    ? $this->documentReviewerAssignmentService->availableReviewersForAssignment($document)
+                     : [],
+                 'permissions' => [
+                     'canAnnotate' => $request->user()?->can('annotate', $document) === true
+@@ -185,10 +177,10 @@ public function show(Request $request, Document $document): Response
+                     'canModerateComments' => $request->user()?->can('moderateComments', $document) === true,
+                 ],
+             ],
+-            'extractedData' => fn () => $this->formatExtractedData(
++            'extractedData' => fn () => $this->documentShowPresenter->formatExtractedData(
+                 $document->extractedData()->first(),
+             ),
+-            'classification' => fn () => $this->formatClassification(
++            'classification' => fn () => $this->documentShowPresenter->formatClassification(
+                 $document->classification()->first(),
+             ),
+             'documentExperience' => fn () => DocumentExperienceGuardrails::inertiaPayload(),
+@@ -197,7 +189,6 @@ public function show(Request $request, Document $document): Response
+ 
+     public function edit(Document $document): Response
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('update', $document);
+ 
+         return Inertia::render('documents/Edit', [
+@@ -208,171 +199,48 @@ public function edit(Document $document): Response
+ 
+     public function review(Request $request, Document $document): RedirectResponse
+     {
+-        return $this->transitionForManualReview(
+-            request: $request,
+-            document: $document,
+-            toStatus: DocumentStatus::Reviewed,
+-            ability: 'review',
+-        );
++        return $this->runManualReviewTransition($request, $document, DocumentStatus::Reviewed, 'review');
+     }
+ 
+     public function approve(Request $request, Document $document): RedirectResponse
+     {
+-        return $this->transitionForManualReview(
+-            request: $request,
+-            document: $document,
+-            toStatus: DocumentStatus::Approved,
+-            ability: 'approve',
+-        );
++        return $this->runManualReviewTransition($request, $document, DocumentStatus::Approved, 'approve');
+     }
+ 
+     public function reject(Request $request, Document $document): RedirectResponse
+     {
+-        return $this->transitionForManualReview(
+-            request: $request,
+-            document: $document,
+-            toStatus: DocumentStatus::Rejected,
+-            ability: 'review',
+-        );
++        return $this->runManualReviewTransition($request, $document, DocumentStatus::Rejected, 'review');
+     }
+ 
+     public function assignReviewer(
+         AssignDocumentReviewerRequest $request,
+         Document $document,
+     ): RedirectResponse {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('assignReviewer', $document);
+-        $document->loadMissing('assignee');
+ 
+-        $previousAssigneeId = $document->assigned_to;
+-        $previousAssigneeName = $document->assignee?->name;
+-        $assignee = $this->resolveReviewerAssignee(
++        $assignee = $this->documentReviewerAssignmentService->resolveAssignee(
+             $request->validated('assigned_to'),
+             $document,
+         );
+ 
+-        if ($previousAssigneeId === $assignee?->id) {
++        $result = $this->documentReviewerAssignmentService->assign($document, $assignee);
++
++        if (! $result['changed']) {
+             return to_route('documents.show', $document);
+         }
+ 
+-        $document->update([
+-            'assigned_to' => $assignee?->id,
++        $this->logDocumentAction($result['document'], $request, 'reviewer_assignment_updated', [
++            'previous_assignee_id' => $result['previous_assignee_id'],
++            'previous_assignee_name' => $result['previous_assignee_name'],
++            'assignee_id' => $result['assignee_id'],
++            'assignee_name' => $result['assignee_name'],
+         ]);
+ 
+-        /** @var Document $freshDocument */
+-        $freshDocument = $document->fresh(['assignee']);
+-
+-        $this->logDocumentAction($freshDocument, $request, 'reviewer_assignment_updated', [
+-            'previous_assignee_id' => $previousAssigneeId,
+-            'previous_assignee_name' => $previousAssigneeName,
+-            'assignee_id' => $assignee?->id,
+-            'assignee_name' => $assignee?->name,
+-        ]);
+-
+-        event(new DocumentStatusUpdated(
+-            document: $freshDocument,
+-            fromStatus: $freshDocument->status->value,
+-            toStatus: $freshDocument->status->value,
+-            traceId: $freshDocument->processing_trace_id,
+-        ));
+-
+-        return to_route('documents.show', $freshDocument);
+-    }
+-
+-    public function bulkApprove(BulkReviewDocumentsRequest $request): JsonResponse
+-    {
+-        return $this->performBulkStatusTransition(
+-            request: $request,
+-            toStatus: DocumentStatus::Approved,
+-            ability: 'approve',
+-            authorizationVerb: 'approve',
+-            successAction: 'approved',
+-        );
+-    }
+-
+-    public function bulkReject(BulkReviewDocumentsRequest $request): JsonResponse
+-    {
+-        return $this->performBulkStatusTransition(
+-            request: $request,
+-            toStatus: DocumentStatus::Rejected,
+-            ability: 'review',
+-            authorizationVerb: 'reject',
+-            successAction: 'rejected',
+-        );
+-    }
+-
+-    public function bulkAssignReviewer(BulkAssignDocumentReviewerRequest $request): JsonResponse
+-    {
+-        /** @var list<int> $documentIds */
+-        $documentIds = $request->validated('document_ids');
+-        $selectedDocuments = $this->selectedDocumentsForBulkAction($documentIds);
+-        $assignee = $this->resolveBulkReviewerAssignee($request->validated('assigned_to'));
+-        $processedIds = [];
+-        $skipped = [];
+-
+-        foreach ($documentIds as $documentId) {
+-            $document = $selectedDocuments->get($documentId);
+-
+-            if (! $document instanceof Document) {
+-                $skipped[] = $this->bulkSkippedDocument($documentId, null, 'Document is no longer available.');
+-
+-                continue;
+-            }
+-
+-            if (! $request->user()?->can('assignReviewer', $document)) {
+-                $skipped[] = $this->bulkSkippedDocument($document->id, $document->title, 'You are not allowed to reassign this document.');
+-
+-                continue;
+-            }
+-
+-            $document->loadMissing('assignee');
+-
+-            if ($document->assigned_to === $assignee?->id) {
+-                $skipped[] = $this->bulkSkippedDocument($document->id, $document->title, 'Reviewer assignment is already up to date.');
+-
+-                continue;
+-            }
+-
+-            $previousAssigneeId = $document->assigned_to;
+-            $previousAssigneeName = $document->assignee?->name;
+-
+-            $document->update([
+-                'assigned_to' => $assignee?->id,
+-            ]);
+-
+-            /** @var Document $freshDocument */
+-            $freshDocument = $document->fresh(['assignee']);
+-
+-            $this->logDocumentAction($freshDocument, $request, 'reviewer_assignment_updated', [
+-                'bulk_action' => true,
+-                'previous_assignee_id' => $previousAssigneeId,
+-                'previous_assignee_name' => $previousAssigneeName,
+-                'assignee_id' => $assignee?->id,
+-                'assignee_name' => $assignee?->name,
+-            ]);
+-
+-            event(new DocumentStatusUpdated(
+-                document: $freshDocument,
+-                fromStatus: $freshDocument->status->value,
+-                toStatus: $freshDocument->status->value,
+-                traceId: $freshDocument->processing_trace_id,
+-            ));
+-
+-            $processedIds[] = $freshDocument->id;
+-        }
+-
+-        return response()->json($this->bulkActionResultPayload(
+-            action: 'reassign',
+-            attemptedCount: count($documentIds),
+-            processedIds: $processedIds,
+-            skipped: $skipped,
+-            successVerb: 'reassigned',
+-        ));
++        return to_route('documents.show', $result['document']);
+     }
+ 
+     public function update(UpdateDocumentRequest $request, Document $document): RedirectResponse
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('update', $document);
+ 
+         $originalTitle = $document->title;
+@@ -391,7 +259,6 @@ public function update(UpdateDocumentRequest $request, Document $document): Redi
+ 
+     public function destroy(Request $request, Document $document): RedirectResponse
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('delete', $document);
+ 
+         /** @var User $user */
+@@ -404,7 +271,6 @@ public function destroy(Request $request, Document $document): RedirectResponse
+ 
+     public function download(Request $request, Document $document): RedirectResponse
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('view', $document);
+ 
+         $this->logDocumentAction($document, $request, 'downloaded');
+@@ -428,345 +294,30 @@ protected function logDocumentAction(Document $document, Request $request, strin
+         ]);
+     }
+ 
+-    protected function ensureCurrentTenantMatter(Matter $matter): Matter
+-    {
+-        abort_unless($matter->tenant_id === tenant()?->id, 404);
+-
+-        return $matter;
+-    }
+-
+-    protected function ensureCurrentTenantDocument(Document $document): Document
+-    {
+-        abort_unless($document->tenant_id === tenant()?->id, 404);
+-
+-        return $document;
+-    }
+-
+     protected function isRealtimeRefresh(Request $request): bool
+     {
+         return $request->header('X-Inertia-Partial-Data') !== null;
+     }
+ 
+-    /**
+-     * @return list<array{id: int, name: string}>
+-     */
+-    protected function availableReviewersForAssignment(Document $document): array
+-    {
+-        return $this->availableReviewersForTenant($document->tenant_id);
+-    }
+-
+-    /**
+-     * @return list<array{id: int, name: string}>
+-     */
+-    protected function availableReviewersForTenant(?string $tenantId): array
+-    {
+-        return $this->withPermissionTeamContext($tenantId, function () use ($tenantId): array {
+-            return User::query()
+-                ->where('tenant_id', $tenantId)
+-                ->orderBy('name')
+-                ->get()
+-                ->filter(fn (User $user): bool => $user->hasRole('associate'))
+-                ->values()
+-                ->map(fn (User $user): array => [
+-                    'id' => $user->id,
+-                    'name' => $user->name,
+-                ])
+-                ->all();
+-        });
+-    }
+-
+-    protected function resolveBulkReviewerAssignee(mixed $assignedTo): ?User
+-    {
+-        if (! is_numeric($assignedTo)) {
+-            return null;
+-        }
+-
+-        /** @var User */
+-        return User::query()
+-            ->where('tenant_id', tenant()?->id)
+-            ->findOrFail((int) $assignedTo);
+-    }
+-
+-    protected function resolveReviewerAssignee(mixed $assignedTo, Document $document): ?User
+-    {
+-        if (! is_numeric($assignedTo)) {
+-            return null;
+-        }
+-
+-        /** @var User */
+-        return User::query()
+-            ->where('tenant_id', $document->tenant_id)
+-            ->findOrFail((int) $assignedTo);
+-    }
+-
+-    /**
+-     * @return array{id: int, consumer_name: string, status_from: string|null, status_to: string|null, event: string, created_at: string}
+-     */
+-    protected function formatProcessingEvent(ProcessingEvent $processingEvent): array
+-    {
+-        return [
+-            'id' => $processingEvent->id,
+-            'consumer_name' => $processingEvent->consumer_name,
+-            'status_from' => $processingEvent->status_from,
+-            'status_to' => $processingEvent->status_to,
+-            'event' => $processingEvent->event,
+-            'created_at' => $processingEvent->created_at->toISOString(),
+-        ];
+-    }
+-
+-    /**
+-     * @return array{
+-     *     provider: string,
+-     *     extracted_text: string|null,
+-     *     payload: array<mixed>|null,
+-     *     metadata: array<mixed>|null,
+-     *     created_at: string,
+-     *     updated_at: string
+-     * }|null
+-     */
+-    protected function formatExtractedData(?ExtractedData $extractedData): ?array
+-    {
+-        if ($extractedData === null) {
+-            return null;
+-        }
+-
+-        return [
+-            'provider' => $extractedData->provider,
+-            'extracted_text' => $extractedData->extracted_text,
+-            'payload' => is_array($extractedData->payload) ? $extractedData->payload : null,
+-            'metadata' => is_array($extractedData->metadata) ? $extractedData->metadata : null,
+-            'created_at' => $extractedData->created_at->toISOString(),
+-            'updated_at' => $extractedData->updated_at->toISOString(),
+-        ];
+-    }
+-
+-    /**
+-     * @return array{
+-     *     provider: string,
+-     *     type: string,
+-     *     confidence: float|null,
+-     *     metadata: array<mixed>|null,
+-     *     created_at: string,
+-     *     updated_at: string
+-     * }|null
+-     */
+-    protected function formatClassification(?DocumentClassification $classification): ?array
+-    {
+-        if ($classification === null) {
+-            return null;
+-        }
+-
+-        return [
+-            'provider' => $classification->provider,
+-            'type' => $classification->type,
+-            'confidence' => is_numeric($classification->confidence) ? (float) $classification->confidence : null,
+-            'metadata' => is_array($classification->metadata) ? $classification->metadata : null,
+-            'created_at' => $classification->created_at->toISOString(),
+-            'updated_at' => $classification->updated_at->toISOString(),
+-        ];
+-    }
+-
+-    protected function transitionForManualReview(
++    protected function runManualReviewTransition(
+         Request $request,
+         Document $document,
+         DocumentStatus $toStatus,
+         string $ability,
+     ): RedirectResponse {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize($ability, $document);
+ 
+-        try {
+-            $transitionedDocument = $this->documentStatusTransitionService->transition(
+-                document: $document,
+-                toStatus: $toStatus,
+-                consumerName: 'manual-review',
+-                messageId: (string) Str::uuid(),
+-                metadata: [
+-                    'source' => 'documents.show',
+-                    'actor_user_id' => $request->user()?->id,
+-                ],
+-            );
+-        } catch (InvalidArgumentException) {
+-            $currentStatus = $document->fresh()?->status;
+-            $fromStatus = $currentStatus instanceof DocumentStatus
+-                ? $currentStatus->value
+-                : $document->status->value;
+-
+-            throw ValidationException::withMessages([
+-                'status' => sprintf(
+-                    'Document cannot transition from [%s] to [%s].',
+-                    $fromStatus,
+-                    $toStatus->value,
+-                ),
+-            ]);
+-        }
++        /** @var User $actor */
++        $actor = $request->user();
+ 
+-        $this->logDocumentAction($transitionedDocument, $request, $toStatus->value);
++        $transitionedDocument = $this->documentManualReviewTransitioner->transition(
++            document: $document,
++            toStatus: $toStatus,
++            actor: $actor,
++            ipAddress: $request->ip(),
++            userAgent: $request->userAgent(),
++        );
+ 
+         return to_route('documents.show', $transitionedDocument);
+     }
+-
+-    protected function performBulkStatusTransition(
+-        BulkReviewDocumentsRequest $request,
+-        DocumentStatus $toStatus,
+-        string $ability,
+-        string $authorizationVerb,
+-        string $successAction,
+-    ): JsonResponse {
+-        /** @var list<int> $documentIds */
+-        $documentIds = $request->validated('document_ids');
+-        $selectedDocuments = $this->selectedDocumentsForBulkAction($documentIds);
+-        $processedIds = [];
+-        $skipped = [];
+-
+-        foreach ($documentIds as $documentId) {
+-            $document = $selectedDocuments->get($documentId);
+-
+-            if (! $document instanceof Document) {
+-                $skipped[] = $this->bulkSkippedDocument($documentId, null, 'Document is no longer available.');
+-
+-                continue;
+-            }
+-
+-            if (! $request->user()?->can($ability, $document)) {
+-                $skipped[] = $this->bulkSkippedDocument(
+-                    $document->id,
+-                    $document->title,
+-                    sprintf('You are not allowed to %s this document.', $authorizationVerb),
+-                );
+-
+-                continue;
+-            }
+-
+-            try {
+-                $transitionedDocument = $this->documentStatusTransitionService->transition(
+-                    document: $document,
+-                    toStatus: $toStatus,
+-                    consumerName: 'bulk-review',
+-                    messageId: (string) Str::uuid(),
+-                    metadata: [
+-                        'source' => 'documents.index.bulk',
+-                        'actor_user_id' => $request->user()?->id,
+-                        'bulk_action' => $successAction,
+-                    ],
+-                );
+-            } catch (InvalidArgumentException) {
+-                $skipped[] = $this->bulkSkippedDocument(
+-                    $document->id,
+-                    $document->title,
+-                    sprintf(
+-                        'Document cannot transition from [%s] to [%s].',
+-                        $document->status->value,
+-                        $toStatus->value,
+-                    ),
+-                );
+-
+-                continue;
+-            }
+-
+-            $this->logDocumentAction($transitionedDocument, $request, $successAction, [
+-                'bulk_action' => true,
+-            ]);
+-
+-            $processedIds[] = $transitionedDocument->id;
+-        }
+-
+-        return response()->json($this->bulkActionResultPayload(
+-            action: $successAction,
+-            attemptedCount: count($documentIds),
+-            processedIds: $processedIds,
+-            skipped: $skipped,
+-            successVerb: $successAction,
+-        ));
+-    }
+-
+-    /**
+-     * @param  list<int>  $documentIds
+-     * @return \Illuminate\Support\Collection<int, Document>
+-     */
+-    protected function selectedDocumentsForBulkAction(array $documentIds): \Illuminate\Support\Collection
+-    {
+-        return Document::query()
+-            ->where('tenant_id', tenant()?->id)
+-            ->whereIn('id', $documentIds)
+-            ->get()
+-            ->keyBy('id');
+-    }
+-
+-    /**
+-     * @param  list<array{document_id: int, title: string|null, reason: string}>  $skipped
+-     * @return array{
+-     *     action: string,
+-     *     attempted_count: int,
+-     *     processed_count: int,
+-     *     skipped_count: int,
+-     *     processed_ids: list<int>,
+-     *     skipped: list<array{document_id: int, title: string|null, reason: string}>,
+-     *     message: string
+-     * }
+-     */
+-    protected function bulkActionResultPayload(
+-        string $action,
+-        int $attemptedCount,
+-        array $processedIds,
+-        array $skipped,
+-        string $successVerb,
+-    ): array {
+-        $processedCount = count($processedIds);
+-        $skippedCount = count($skipped);
+-
+-        $message = $processedCount > 0
+-            ? sprintf(
+-                '%s %d %s%s',
+-                ucfirst($successVerb),
+-                $processedCount,
+-                Str::plural('document', $processedCount),
+-                $skippedCount > 0 ? sprintf('. Skipped %d.', $skippedCount) : '.',
+-            )
+-            : sprintf('No documents were %s.', $successVerb);
+-
+-        return [
+-            'action' => $action,
+-            'attempted_count' => $attemptedCount,
+-            'processed_count' => $processedCount,
+-            'skipped_count' => $skippedCount,
+-            'processed_ids' => $processedIds,
+-            'skipped' => $skipped,
+-            'message' => $message,
+-        ];
+-    }
+-
+-    /**
+-     * @return array{document_id: int, title: string|null, reason: string}
+-     */
+-    protected function bulkSkippedDocument(int $documentId, ?string $title, string $reason): array
+-    {
+-        return [
+-            'document_id' => $documentId,
+-            'title' => $title,
+-            'reason' => $reason,
+-        ];
+-    }
+-
+-    /**
+-     * @template TReturn
+-     *
+-     * @param  callable(): TReturn  $callback
+-     * @return TReturn
+-     */
+-    protected function withPermissionTeamContext(?string $tenantId, callable $callback): mixed
+-    {
+-        if (! function_exists('getPermissionsTeamId') || ! function_exists('setPermissionsTeamId')) {
+-            return $callback();
+-        }
+-
+-        $originalTeamId = getPermissionsTeamId();
+-        setPermissionsTeamId($tenantId);
+-
+-        try {
+-            return $callback();
+-        } finally {
+-            setPermissionsTeamId($originalTeamId);
+-        }
+-    }
+ }
+diff --git a/app/Services/Documents/.gitkeep b/app/Services/Documents/.gitkeep
+new file mode 100644
+index 0000000..e69de29
+diff --git a/app/Services/Documents/DocumentBulkReviewService.php b/app/Services/Documents/DocumentBulkReviewService.php
+new file mode 100644
+index 0000000..d6b49fb
+--- /dev/null
++++ b/app/Services/Documents/DocumentBulkReviewService.php
+@@ -0,0 +1,306 @@
++<?php
++
++namespace App\Services\Documents;
++
++use App\Enums\DocumentStatus;
++use App\Events\DocumentStatusUpdated;
++use App\Models\Document;
++use App\Models\User;
++use App\Services\DocumentStatusTransitionService;
++use Illuminate\Contracts\Auth\Authenticatable;
++use Illuminate\Support\Collection;
++use Illuminate\Support\Str;
++use InvalidArgumentException;
++
++class DocumentBulkReviewService
++{
++    public function __construct(
++        protected readonly DocumentStatusTransitionService $statusTransitionService,
++    ) {}
++
++    /**
++     * @param  list<int>  $documentIds
++     * @return array{
++     *     action: string,
++     *     attempted_count: int,
++     *     processed_count: int,
++     *     skipped_count: int,
++     *     processed_ids: list<int>,
++     *     skipped: list<array{document_id: int, title: string|null, reason: string}>,
++     *     message: string
++     * }
++     */
++    public function performStatusTransition(
++        array $documentIds,
++        DocumentStatus $toStatus,
++        string $ability,
++        string $authorizationVerb,
++        string $successAction,
++        Authenticatable $actor,
++        ?string $ipAddress = null,
++        ?string $userAgent = null,
++    ): array {
++        $selectedDocuments = $this->selectedDocumentsForBulkAction($documentIds);
++        $processedIds = [];
++        $skipped = [];
++
++        foreach ($documentIds as $documentId) {
++            $document = $selectedDocuments->get($documentId);
++
++            if (! $document instanceof Document) {
++                $skipped[] = $this->skippedDocument($documentId, null, 'Document is no longer available.');
++
++                continue;
++            }
++
++            if (! $actor->can($ability, $document)) {
++                $skipped[] = $this->skippedDocument(
++                    $document->id,
++                    $document->title,
++                    sprintf('You are not allowed to %s this document.', $authorizationVerb),
++                );
++
++                continue;
++            }
++
++            try {
++                $transitionedDocument = $this->statusTransitionService->transition(
++                    document: $document,
++                    toStatus: $toStatus,
++                    consumerName: 'bulk-review',
++                    messageId: (string) Str::uuid(),
++                    metadata: [
++                        'source' => 'documents.index.bulk',
++                        'actor_user_id' => $actor->getAuthIdentifier(),
++                        'bulk_action' => $successAction,
++                    ],
++                );
++            } catch (InvalidArgumentException) {
++                $skipped[] = $this->skippedDocument(
++                    $document->id,
++                    $document->title,
++                    sprintf(
++                        'Document cannot transition from [%s] to [%s].',
++                        $document->status->value,
++                        $toStatus->value,
++                    ),
++                );
++
++                continue;
++            }
++
++            $this->writeAuditLog(
++                document: $transitionedDocument,
++                actor: $actor,
++                action: $successAction,
++                ipAddress: $ipAddress,
++                userAgent: $userAgent,
++                extraMetadata: ['bulk_action' => true],
++            );
++
++            $processedIds[] = $transitionedDocument->id;
++        }
++
++        return $this->buildResultPayload(
++            action: $successAction,
++            attemptedCount: count($documentIds),
++            processedIds: $processedIds,
++            skipped: $skipped,
++            successVerb: $successAction,
++        );
++    }
++
++    /**
++     * @param  list<int>  $documentIds
++     * @return array{
++     *     action: string,
++     *     attempted_count: int,
++     *     processed_count: int,
++     *     skipped_count: int,
++     *     processed_ids: list<int>,
++     *     skipped: list<array{document_id: int, title: string|null, reason: string}>,
++     *     message: string
++     * }
++     */
++    public function performReviewerAssignment(
++        array $documentIds,
++        mixed $assignedTo,
++        Authenticatable $actor,
++        ?string $ipAddress = null,
++        ?string $userAgent = null,
++    ): array {
++        $selectedDocuments = $this->selectedDocumentsForBulkAction($documentIds);
++        $assignee = $this->resolveAssignee($assignedTo);
++        $processedIds = [];
++        $skipped = [];
++
++        foreach ($documentIds as $documentId) {
++            $document = $selectedDocuments->get($documentId);
++
++            if (! $document instanceof Document) {
++                $skipped[] = $this->skippedDocument($documentId, null, 'Document is no longer available.');
++
++                continue;
++            }
++
++            if (! $actor->can('assignReviewer', $document)) {
++                $skipped[] = $this->skippedDocument($document->id, $document->title, 'You are not allowed to reassign this document.');
++
++                continue;
++            }
++
++            $document->loadMissing('assignee');
++
++            if ($document->assigned_to === $assignee?->id) {
++                $skipped[] = $this->skippedDocument($document->id, $document->title, 'Reviewer assignment is already up to date.');
++
++                continue;
++            }
++
++            $previousAssigneeId = $document->assigned_to;
++            $previousAssigneeName = $document->assignee?->name;
++
++            $document->update([
++                'assigned_to' => $assignee?->id,
++            ]);
++
++            /** @var Document $freshDocument */
++            $freshDocument = $document->fresh(['assignee']);
++
++            $this->writeAuditLog(
++                document: $freshDocument,
++                actor: $actor,
++                action: 'reviewer_assignment_updated',
++                ipAddress: $ipAddress,
++                userAgent: $userAgent,
++                extraMetadata: [
++                    'bulk_action' => true,
++                    'previous_assignee_id' => $previousAssigneeId,
++                    'previous_assignee_name' => $previousAssigneeName,
++                    'assignee_id' => $assignee?->id,
++                    'assignee_name' => $assignee?->name,
++                ],
++            );
++
++            event(new DocumentStatusUpdated(
++                document: $freshDocument,
++                fromStatus: $freshDocument->status->value,
++                toStatus: $freshDocument->status->value,
++                traceId: $freshDocument->processing_trace_id,
++            ));
++
++            $processedIds[] = $freshDocument->id;
++        }
++
++        return $this->buildResultPayload(
++            action: 'reassign',
++            attemptedCount: count($documentIds),
++            processedIds: $processedIds,
++            skipped: $skipped,
++            successVerb: 'reassigned',
++        );
++    }
++
++    public function resolveAssignee(mixed $assignedTo): ?User
++    {
++        if (! is_numeric($assignedTo)) {
++            return null;
++        }
++
++        /** @var User */
++        return User::query()
++            ->where('tenant_id', tenant()?->id)
++            ->findOrFail((int) $assignedTo);
++    }
++
++    /**
++     * @param  list<int>  $documentIds
++     * @return Collection<int, Document>
++     */
++    protected function selectedDocumentsForBulkAction(array $documentIds): Collection
++    {
++        return Document::query()
++            ->where('tenant_id', tenant()?->id)
++            ->whereIn('id', $documentIds)
++            ->get()
++            ->keyBy('id');
++    }
++
++    /**
++     * @return array{document_id: int, title: string|null, reason: string}
++     */
++    protected function skippedDocument(int $documentId, ?string $title, string $reason): array
++    {
++        return [
++            'document_id' => $documentId,
++            'title' => $title,
++            'reason' => $reason,
++        ];
++    }
++
++    /**
++     * @param  list<int>  $processedIds
++     * @param  list<array{document_id: int, title: string|null, reason: string}>  $skipped
++     * @return array{
++     *     action: string,
++     *     attempted_count: int,
++     *     processed_count: int,
++     *     skipped_count: int,
++     *     processed_ids: list<int>,
++     *     skipped: list<array{document_id: int, title: string|null, reason: string}>,
++     *     message: string
++     * }
++     */
++    protected function buildResultPayload(
++        string $action,
++        int $attemptedCount,
++        array $processedIds,
++        array $skipped,
++        string $successVerb,
++    ): array {
++        $processedCount = count($processedIds);
++        $skippedCount = count($skipped);
++
++        $message = $processedCount > 0
++            ? sprintf(
++                '%s %d %s%s',
++                ucfirst($successVerb),
++                $processedCount,
++                Str::plural('document', $processedCount),
++                $skippedCount > 0 ? sprintf('. Skipped %d.', $skippedCount) : '.',
++            )
++            : sprintf('No documents were %s.', $successVerb);
++
++        return [
++            'action' => $action,
++            'attempted_count' => $attemptedCount,
++            'processed_count' => $processedCount,
++            'skipped_count' => $skippedCount,
++            'processed_ids' => $processedIds,
++            'skipped' => $skipped,
++            'message' => $message,
++        ];
++    }
++
++    /**
++     * @param  array<string, mixed>  $extraMetadata
++     */
++    protected function writeAuditLog(
++        Document $document,
++        Authenticatable $actor,
++        string $action,
++        ?string $ipAddress,
++        ?string $userAgent,
++        array $extraMetadata = [],
++    ): void {
++        $document->auditLogs()->create([
++            'tenant_id' => $document->tenant_id,
++            'user_id' => $actor->getAuthIdentifier(),
++            'action' => $action,
++            'metadata' => array_merge([
++                'ip_address' => $ipAddress,
++                'user_agent' => $userAgent,
++            ], $extraMetadata),
++        ]);
++    }
++}
+diff --git a/app/Services/Documents/DocumentManualReviewTransitioner.php b/app/Services/Documents/DocumentManualReviewTransitioner.php
+new file mode 100644
+index 0000000..6dd85e1
+--- /dev/null
++++ b/app/Services/Documents/DocumentManualReviewTransitioner.php
+@@ -0,0 +1,69 @@
++<?php
++
++namespace App\Services\Documents;
++
++use App\Enums\DocumentStatus;
++use App\Models\Document;
++use App\Services\DocumentStatusTransitionService;
++use Illuminate\Contracts\Auth\Authenticatable;
++use Illuminate\Support\Str;
++use Illuminate\Validation\ValidationException;
++use InvalidArgumentException;
++
++class DocumentManualReviewTransitioner
++{
++    public function __construct(
++        protected readonly DocumentStatusTransitionService $statusTransitionService,
++    ) {}
++
++    /**
++     * Transition the document for a manual-review action and persist an audit
++     * log of the action. Translates a domain InvalidArgumentException raised
++     * by the status state-machine into a ValidationException keyed by 'status'.
++     */
++    public function transition(
++        Document $document,
++        DocumentStatus $toStatus,
++        Authenticatable $actor,
++        ?string $ipAddress = null,
++        ?string $userAgent = null,
++    ): Document {
++        try {
++            $transitionedDocument = $this->statusTransitionService->transition(
++                document: $document,
++                toStatus: $toStatus,
++                consumerName: 'manual-review',
++                messageId: (string) Str::uuid(),
++                metadata: [
++                    'source' => 'documents.show',
++                    'actor_user_id' => $actor->getAuthIdentifier(),
++                ],
++            );
++        } catch (InvalidArgumentException) {
++            $currentStatus = $document->fresh()?->status;
++            $fromStatus = $currentStatus instanceof DocumentStatus
++                ? $currentStatus->value
++                : $document->status->value;
++
++            throw ValidationException::withMessages([
++                'status' => sprintf(
++                    'Document cannot transition from [%s] to [%s].',
++                    $fromStatus,
++                    $toStatus->value,
++                ),
++            ]);
++        }
++
++        $transitionedDocument->auditLogs()->create([
++            'tenant_id' => $transitionedDocument->tenant_id,
++            'user_id' => $actor->getAuthIdentifier(),
++            'action' => $toStatus->value,
++            'metadata' => [
++                'ip_address' => $ipAddress,
++                'user_agent' => $userAgent,
++            ],
++        ]);
++
++        return $transitionedDocument;
++    }
++}
+diff --git a/app/Services/Documents/DocumentReviewerAssignmentService.php b/app/Services/Documents/DocumentReviewerAssignmentService.php
+new file mode 100644
+index 0000000..345e6c2
+--- /dev/null
++++ b/app/Services/Documents/DocumentReviewerAssignmentService.php
+@@ -0,0 +1,117 @@
++<?php
++
++namespace App\Services\Documents;
++
++use App\Events\DocumentStatusUpdated;
++use App\Models\Document;
++use App\Models\User;
++
++class DocumentReviewerAssignmentService
++{
++    /**
++     * @return list<array{id: int, name: string}>
++     */
++    public function availableReviewersForAssignment(Document $document): array
++    {
++        return $this->availableReviewersForTenant($document->tenant_id);
++    }
++
++    /**
++     * @return list<array{id: int, name: string}>
++     */
++    public function availableReviewersForTenant(?string $tenantId): array
++    {
++        return $this->withPermissionTeamContext($tenantId, function () use ($tenantId): array {
++            return User::query()
++                ->where('tenant_id', $tenantId)
++                ->orderBy('name')
++                ->get()
++                ->filter(fn (User $user): bool => $user->hasRole('associate'))
++                ->values()
++                ->map(fn (User $user): array => [
++                    'id' => $user->id,
++                    'name' => $user->name,
++                ])
++                ->all();
++        });
++    }
++
++    public function resolveAssignee(mixed $assignedTo, Document $document): ?User
++    {
++        if (! is_numeric($assignedTo)) {
++            return null;
++        }
++
++        /** @var User */
++        return User::query()
++            ->where('tenant_id', $document->tenant_id)
++            ->findOrFail((int) $assignedTo);
++    }
++
++    /**
++     * @return array{previous_assignee_id: int|null, previous_assignee_name: string|null, assignee_id: int|null, assignee_name: string|null, document: Document, changed: bool}
++     */
++    public function assign(Document $document, ?User $assignee): array
++    {
++        $document->loadMissing('assignee');
++
++        $previousAssigneeId = $document->assigned_to;
++        $previousAssigneeName = $document->assignee?->name;
++
++        if ($previousAssigneeId === $assignee?->id) {
++            return [
++                'previous_assignee_id' => $previousAssigneeId,
++                'previous_assignee_name' => $previousAssigneeName,
++                'assignee_id' => $assignee?->id,
++                'assignee_name' => $assignee?->name,
++                'document' => $document,
++                'changed' => false,
++            ];
++        }
++
++        $document->update([
++            'assigned_to' => $assignee?->id,
++        ]);
++
++        /** @var Document $freshDocument */
++        $freshDocument = $document->fresh(['assignee']);
++
++        event(new DocumentStatusUpdated(
++            document: $freshDocument,
++            fromStatus: $freshDocument->status->value,
++            toStatus: $freshDocument->status->value,
++            traceId: $freshDocument->processing_trace_id,
++        ));
++
++        return [
++            'previous_assignee_id' => $previousAssigneeId,
++            'previous_assignee_name' => $previousAssigneeName,
++            'assignee_id' => $assignee?->id,
++            'assignee_name' => $assignee?->name,
++            'document' => $freshDocument,
++            'changed' => true,
++        ];
++    }
++
++    /**
++     * @template TReturn
++     *
++     * @param  callable(): TReturn  $callback
++     * @return TReturn
++     */
++    protected function withPermissionTeamContext(?string $tenantId, callable $callback): mixed
++    {
++        if (! function_exists('getPermissionsTeamId') || ! function_exists('setPermissionsTeamId')) {
++            return $callback();
++        }
++
++        $originalTeamId = getPermissionsTeamId();
++        setPermissionsTeamId($tenantId);
++
++        try {
++            return $callback();
++        } finally {
++            setPermissionsTeamId($originalTeamId);
++        }
++    }
++}
+diff --git a/app/Services/Documents/DocumentShowPresenter.php b/app/Services/Documents/DocumentShowPresenter.php
+new file mode 100644
+index 0000000..1f62ded
+--- /dev/null
++++ b/app/Services/Documents/DocumentShowPresenter.php
+@@ -0,0 +1,84 @@
++<?php
++
++namespace App\Services\Documents;
++
++use App\Models\DocumentClassification;
++use App\Models\ExtractedData;
++use App\Models\ProcessingEvent;
++
++class DocumentShowPresenter
++{
++    /**
++     * @return array{
++     *     id: int,
++     *     consumer_name: string,
++     *     status_from: string|null,
++     *     status_to: string|null,
++     *     event: string,
++     *     created_at: string
++     * }
++     */
++    public function formatProcessingEvent(ProcessingEvent $processingEvent): array
++    {
++        return [
++            'id' => $processingEvent->id,
++            'consumer_name' => $processingEvent->consumer_name,
++            'status_from' => $processingEvent->status_from,
++            'status_to' => $processingEvent->status_to,
++            'event' => $processingEvent->event,
++            'created_at' => $processingEvent->created_at->toISOString(),
++        ];
++    }
++
++    /**
++     * @return array{
++     *     provider: string,
++     *     extracted_text: string|null,
++     *     payload: array<mixed>|null,
++     *     metadata: array<mixed>|null,
++     *     created_at: string,
++     *     updated_at: string
++     * }|null
++     */
++    public function formatExtractedData(?ExtractedData $extractedData): ?array
++    {
++        if ($extractedData === null) {
++            return null;
++        }
++
++        return [
++            'provider' => $extractedData->provider,
++            'extracted_text' => $extractedData->extracted_text,
++            'payload' => is_array($extractedData->payload) ? $extractedData->payload : null,
++            'metadata' => is_array($extractedData->metadata) ? $extractedData->metadata : null,
++            'created_at' => $extractedData->created_at->toISOString(),
++            'updated_at' => $extractedData->updated_at->toISOString(),
++        ];
++    }
++
++    /**
++     * @return array{
++     *     provider: string,
++     *     type: string,
++     *     confidence: float|null,
++     *     metadata: array<mixed>|null,
++     *     created_at: string,
++     *     updated_at: string
++     * }|null
++     */
++    public function formatClassification(?DocumentClassification $classification): ?array
++    {
++        if ($classification === null) {
++            return null;
++        }
++
++        return [
++            'provider' => $classification->provider,
++            'type' => $classification->type,
++            'confidence' => is_numeric($classification->confidence) ? (float) $classification->confidence : null,
++            'metadata' => is_array($classification->metadata) ? $classification->metadata : null,
++            'created_at' => $classification->created_at->toISOString(),
++            'updated_at' => $classification->updated_at->toISOString(),
++        ];
++    }
++}
+diff --git a/bootstrap/app.php b/bootstrap/app.php
+index f376d71..0a7c701 100644
+--- a/bootstrap/app.php
++++ b/bootstrap/app.php
+@@ -29,6 +29,11 @@
+         $middleware->alias([
+             'tenant' => InitializeTenantContext::class,
+         ]);
++
++        $middleware->prependToPriorityList(
++            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
++            prepend: \App\Http\Middleware\InitializeTenantContext::class,
++        );
+     })
+     ->withExceptions(function (Exceptions $exceptions): void {
+         //
+diff --git a/phpunit.xml b/phpunit.xml
+index 2802954..dfd25ca 100644
+--- a/phpunit.xml
++++ b/phpunit.xml
+@@ -11,6 +11,9 @@
+         <testsuite name="Feature">
+             <directory>tests/Feature</directory>
+         </testsuite>
++        <testsuite name="Architecture">
++            <directory>tests/Architecture</directory>
++        </testsuite>
+     </testsuites>
+     <source>
+         <include>
+diff --git a/routes/documents.php b/routes/documents.php
+index 9116873..7fded39 100644
+--- a/routes/documents.php
++++ b/routes/documents.php
+@@ -1,5 +1,6 @@
+ <?php
+ 
++use App\Http\Controllers\BulkDocumentReviewController;
+ use App\Http\Controllers\DocumentAnnotationController;
+ use App\Http\Controllers\DocumentCommentController;
+ use App\Http\Controllers\DocumentController;
+@@ -13,11 +14,11 @@
+ 
+     Route::get('documents/{document}/preview', [DocumentController::class, 'preview'])
+         ->name('documents.preview');
+-    Route::post('documents/bulk/approve', [DocumentController::class, 'bulkApprove'])
++    Route::post('documents/bulk/approve', [BulkDocumentReviewController::class, 'approve'])
+         ->name('documents.bulk.approve');
+-    Route::post('documents/bulk/reject', [DocumentController::class, 'bulkReject'])
++    Route::post('documents/bulk/reject', [BulkDocumentReviewController::class, 'reject'])
+         ->name('documents.bulk.reject');
+-    Route::patch('documents/bulk/reviewer', [DocumentController::class, 'bulkAssignReviewer'])
++    Route::patch('documents/bulk/reviewer', [BulkDocumentReviewController::class, 'assignReviewer'])
+         ->name('documents.bulk.reviewer.assign');
+     Route::post('documents/{document}/review', [DocumentController::class, 'review'])
+         ->name('documents.review');
+diff --git a/tests/Architecture/ArchitecturalRulesTest.php b/tests/Architecture/ArchitecturalRulesTest.php
+index 057fc98..700ed5f 100644
+--- a/tests/Architecture/ArchitecturalRulesTest.php
++++ b/tests/Architecture/ArchitecturalRulesTest.php
+@@ -41,3 +41,55 @@
+         'App\Http\Controllers\Admin\QueueHealthController',
+         'App\Broadcasting\BroadcastChannelAuthorizer',
+     ]);
++
++test('controllers do not reintroduce ad-hoc tenant scoping helpers', function (): void {
++    $controllersPath = dirname(__DIR__, 2).'/app/Http/Controllers';
++
++    $controllerFiles = (new Symfony\Component\Finder\Finder)
++        ->in($controllersPath)
++        ->files()
++        ->name('*.php');
++
++    $offenders = [];
++
++    foreach ($controllerFiles as $controllerFile) {
++        if (preg_match('/ensureCurrentTenant\w*/', $controllerFile->getContents()) === 1) {
++            $offenders[] = $controllerFile->getRelativePathname();
++        }
++    }
++
++    expect($offenders)->toBeEmpty(
++        sprintf(
++            'Controllers must rely on the BelongsToTenant global scope; ad-hoc ensureCurrentTenant* helpers found in: %s',
++            implode(', ', $offenders),
++        ),
++    );
++});
++
++test('controllers do not reintroduce view-data formatters or domain transition helpers', function (): void {
++    $controllersPath = dirname(__DIR__, 2).'/app/Http/Controllers';
++
++    $controllerFiles = (new Symfony\Component\Finder\Finder)
++        ->in($controllersPath)
++        ->files()
++        ->name('*.php');
++
++    $forbiddenMethodPattern = '/function\s+(format[A-Z]\w*|resolve\w*Assignee|performBulk\w*|transitionFor\w*)\s*\(/';
++
++    $offenders = [];
++
++    foreach ($controllerFiles as $controllerFile) {
++        if (preg_match_all($forbiddenMethodPattern, $controllerFile->getContents(), $matches) > 0) {
++            foreach ($matches[1] as $methodName) {
++                $offenders[] = sprintf('%s::%s', $controllerFile->getRelativePathname(), $methodName);
++            }
++        }
++    }
++
++    expect($offenders)->toBeEmpty(
++        sprintf(
++            'Controllers must delegate view-data formatting and domain transitions to dedicated services; offending methods: %s',
++            implode(', ', $offenders),
++        ),
++    );
++});
+diff --git a/tests/Unit/Models/TenantScopeTest.php b/tests/Unit/Models/TenantScopeTest.php
+new file mode 100644
+index 0000000..21789ff
+--- /dev/null
++++ b/tests/Unit/Models/TenantScopeTest.php
+@@ -0,0 +1,52 @@
++<?php
++
++declare(strict_types=1);
++
++use App\Models\Client;
++use App\Models\Document;
++use App\Models\Matter;
++use App\Models\Tenant;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Stancl\Tenancy\Database\TenantScope;
++
++pest()->extend(Tests\TestCase::class)->use(RefreshDatabase::class);
++
++afterEach(function (): void {
++    tenancy()->end();
++});
++
++function makeTenantScopedDocument(): Document
++{
++    $tenant = Tenant::factory()->create();
++    $client = Client::factory()->create(['tenant_id' => $tenant->id]);
++    $matter = Matter::factory()->create(['tenant_id' => $tenant->id, 'client_id' => $client->id]);
++
++    return Document::factory()->create(['tenant_id' => $tenant->id, 'matter_id' => $matter->id]);
++}
++
++test('Document::find returns null for foreign-tenant id', function (): void {
++    $foreignDocument = makeTenantScopedDocument();
++    $currentTenant = Tenant::factory()->create();
++
++    tenancy()->initialize($currentTenant);
++
++    expect(Document::find($foreignDocument->id))->toBeNull();
++});
++
++test('Document::find returns the model for matching tenant', function (): void {
++    $document = makeTenantScopedDocument();
++    $tenant = Tenant::query()->findOrFail($document->tenant_id);
++
++    tenancy()->initialize($tenant);
++
++    expect(Document::find($document->id))->not->toBeNull();
++});
++
++test('Document::withoutGlobalScope(TenantScope::class)->find bypasses scope', function (): void {
++    $foreignDocument = makeTenantScopedDocument();
++    $currentTenant = Tenant::factory()->create();
++
++    tenancy()->initialize($currentTenant);
++
++    expect(Document::withoutGlobalScope(TenantScope::class)->find($foreignDocument->id))->not->toBeNull();
++});
+diff --git a/tests/Unit/Services/Documents/DocumentBulkReviewServiceTest.php b/tests/Unit/Services/Documents/DocumentBulkReviewServiceTest.php
+new file mode 100644
+index 0000000..60a3297
+--- /dev/null
++++ b/tests/Unit/Services/Documents/DocumentBulkReviewServiceTest.php
+@@ -0,0 +1,246 @@
++<?php
++
++declare(strict_types=1);
++
++use App\Enums\DocumentStatus;
++use App\Models\AuditLog;
++use App\Models\Client;
++use App\Models\Document;
++use App\Models\Matter;
++use App\Models\Tenant;
++use App\Models\User;
++use App\Services\Documents\DocumentBulkReviewService;
++use Database\Seeders\RolesAndPermissionsSeeder;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Spatie\Permission\PermissionRegistrar;
++
++pest()->extend(Tests\TestCase::class)->use(RefreshDatabase::class);
++
++beforeEach(function (): void {
++    (new RolesAndPermissionsSeeder)->run();
++    app(PermissionRegistrar::class)->forgetCachedPermissions();
++});
++
++afterEach(function (): void {
++    setPermissionsTeamId(null);
++    tenancy()->end();
++});
++
++function makeBulkReviewContext(string $role = 'partner'): array
++{
++    $tenant = Tenant::factory()->create();
++    $user = User::factory()->forTenant($tenant)->create();
++    $client = Client::factory()->create(['tenant_id' => $tenant->id]);
++    $matter = Matter::factory()->create([
++        'tenant_id' => $tenant->id,
++        'client_id' => $client->id,
++    ]);
++
++    setPermissionsTeamId($tenant->id);
++    $user->assignRole($role);
++    setPermissionsTeamId(null);
++
++    tenancy()->initialize($tenant);
++    setPermissionsTeamId($tenant->id);
++
++    return [$tenant, $user, $matter];
++}
++
++test('performStatusTransition approves eligible documents and skips invalid transitions', function (): void {
++    [$tenant, $user, $matter] = makeBulkReviewContext('partner');
++
++    $reviewedDoc = Document::factory()->reviewed()->create([
++        'tenant_id' => $tenant->id,
++        'matter_id' => $matter->id,
++        'uploaded_by' => $user->id,
++    ]);
++    $readyDoc = Document::factory()->readyForReview()->create([
++        'tenant_id' => $tenant->id,
++        'matter_id' => $matter->id,
++        'uploaded_by' => $user->id,
++    ]);
++
++    /** @var DocumentBulkReviewService $service */
++    $service = app(DocumentBulkReviewService::class);
++
++    $payload = $service->performStatusTransition(
++        documentIds: [$reviewedDoc->id, $readyDoc->id],
++        toStatus: DocumentStatus::Approved,
++        ability: 'approve',
++        authorizationVerb: 'approve',
++        successAction: 'approved',
++        actor: $user,
++        ipAddress: '127.0.0.1',
++        userAgent: 'phpunit',
++    );
++
++    expect($payload['action'])->toBe('approved')
++        ->and($payload['attempted_count'])->toBe(2)
++        ->and($payload['processed_count'])->toBe(1)
++        ->and($payload['skipped_count'])->toBe(1)
++        ->and($payload['processed_ids'])->toBe([$reviewedDoc->id])
++        ->and($payload['skipped'][0]['document_id'])->toBe($readyDoc->id)
++        ->and($payload['skipped'][0]['reason'])->toBe('Document cannot transition from [ready_for_review] to [approved].')
++        ->and($payload['message'])->toBe('Approved 1 document. Skipped 1.');
++
++    expect($reviewedDoc->fresh()?->status->value)->toBe('approved')
++        ->and($readyDoc->fresh()?->status->value)->toBe('ready_for_review');
++});
++
++test('performStatusTransition skips documents the actor cannot authorize', function (): void {
++    [$tenant, $user, $matter] = makeBulkReviewContext('associate');
++
++    $reviewedDoc = Document::factory()->reviewed()->create([
++        'tenant_id' => $tenant->id,
++        'matter_id' => $matter->id,
++        'uploaded_by' => $user->id,
++    ]);
++
++    /** @var DocumentBulkReviewService $service */
++    $service = app(DocumentBulkReviewService::class);
++
++    $payload = $service->performStatusTransition(
++        documentIds: [$reviewedDoc->id],
++        toStatus: DocumentStatus::Approved,
++        ability: 'approve',
++        authorizationVerb: 'approve',
++        successAction: 'approved',
++        actor: $user,
++    );
++
++    expect($payload['processed_count'])->toBe(0)
++        ->and($payload['skipped_count'])->toBe(1)
++        ->and($payload['skipped'][0]['reason'])->toBe('You are not allowed to approve this document.')
++        ->and($payload['message'])->toBe('No documents were approved.');
++});
++
++test('performStatusTransition reports unknown ids as skipped', function (): void {
++    [, $user] = makeBulkReviewContext('partner');
++
++    /** @var DocumentBulkReviewService $service */
++    $service = app(DocumentBulkReviewService::class);
++
++    $payload = $service->performStatusTransition(
++        documentIds: [999999],
++        toStatus: DocumentStatus::Approved,
++        ability: 'approve',
++        authorizationVerb: 'approve',
++        successAction: 'approved',
++        actor: $user,
++    );
++
++    expect($payload['skipped_count'])->toBe(1)
++        ->and($payload['skipped'][0]['document_id'])->toBe(999999)
++        ->and($payload['skipped'][0]['title'])->toBeNull()
++        ->and($payload['skipped'][0]['reason'])->toBe('Document is no longer available.');
++});
++
++test('performStatusTransition writes a bulk_action audit entry per processed document', function (): void {
++    [$tenant, $user, $matter] = makeBulkReviewContext('partner');
++
++    $reviewedDoc = Document::factory()->reviewed()->create([
++        'tenant_id' => $tenant->id,
++        'matter_id' => $matter->id,
++        'uploaded_by' => $user->id,
++    ]);
++
++    /** @var DocumentBulkReviewService $service */
++    $service = app(DocumentBulkReviewService::class);
++
++    $service->performStatusTransition(
++        documentIds: [$reviewedDoc->id],
++        toStatus: DocumentStatus::Approved,
++        ability: 'approve',
++        authorizationVerb: 'approve',
++        successAction: 'approved',
++        actor: $user,
++        ipAddress: '127.0.0.1',
++        userAgent: 'phpunit',
++    );
++
++    expect(AuditLog::query()
++        ->where('auditable_type', Document::class)
++        ->where('auditable_id', $reviewedDoc->id)
++        ->where('action', 'approved')
++        ->where('metadata->bulk_action', true)
++        ->exists())->toBeTrue();
++});
++
++test('performReviewerAssignment assigns associate to documents and skips unchanged assignees', function (): void {
++    [$tenant, $user, $matter] = makeBulkReviewContext('partner');
++
++    $reviewer = User::factory()->forTenant($tenant)->create(['name' => 'Jordan Associate']);
++    setPermissionsTeamId($tenant->id);
++    $reviewer->assignRole('associate');
++    setPermissionsTeamId($tenant->id);
++
++    $alreadyAssigned = Document::factory()->readyForReview()->create([
++        'tenant_id' => $tenant->id,
++        'matter_id' => $matter->id,
++        'uploaded_by' => $user->id,
++        'assigned_to' => $reviewer->id,
++    ]);
++    $unassigned = Document::factory()->readyForReview()->create([
++        'tenant_id' => $tenant->id,
++        'matter_id' => $matter->id,
++        'uploaded_by' => $user->id,
++    ]);
++
++    /** @var DocumentBulkReviewService $service */
++    $service = app(DocumentBulkReviewService::class);
++
++    $payload = $service->performReviewerAssignment(
++        documentIds: [$alreadyAssigned->id, $unassigned->id],
++        assignedTo: $reviewer->id,
++        actor: $user,
++        ipAddress: '127.0.0.1',
++        userAgent: 'phpunit',
++    );
++
++    expect($payload['action'])->toBe('reassign')
++        ->and($payload['processed_count'])->toBe(1)
++        ->and($payload['skipped_count'])->toBe(1)
++        ->and($payload['processed_ids'])->toBe([$unassigned->id])
++        ->and($payload['skipped'][0]['document_id'])->toBe($alreadyAssigned->id)
++        ->and($payload['skipped'][0]['reason'])->toBe('Reviewer assignment is already up to date.')
++        ->and($payload['message'])->toBe('Reassigned 1 document. Skipped 1.');
++
++    expect($unassigned->fresh()?->assigned_to)->toBe($reviewer->id);
++});
++
++test('performReviewerAssignment skips documents the actor cannot reassign', function (): void {
++    [$tenant, $user, $matter] = makeBulkReviewContext('associate');
++
++    $reviewer = User::factory()->forTenant($tenant)->create();
++    setPermissionsTeamId($tenant->id);
++    $reviewer->assignRole('associate');
++    setPermissionsTeamId($tenant->id);
++
++    $document = Document::factory()->readyForReview()->create([
++        'tenant_id' => $tenant->id,
++        'matter_id' => $matter->id,
++        'uploaded_by' => $user->id,
++    ]);
++
++    /** @var DocumentBulkReviewService $service */
++    $service = app(DocumentBulkReviewService::class);
++
++    $payload = $service->performReviewerAssignment(
++        documentIds: [$document->id],
++        assignedTo: $reviewer->id,
++        actor: $user,
++    );
++
++    expect($payload['processed_count'])->toBe(0)
++        ->and($payload['skipped'][0]['reason'])->toBe('You are not allowed to reassign this document.');
++});
++
++test('resolveAssignee returns null for non-numeric input', function (): void {
++    makeBulkReviewContext();
++
++    /** @var DocumentBulkReviewService $service */
++    $service = app(DocumentBulkReviewService::class);
++
++    expect($service->resolveAssignee(null))->toBeNull()
++        ->and($service->resolveAssignee(''))->toBeNull();
++});
+diff --git a/tests/Unit/Services/Documents/DocumentManualReviewTransitionerTest.php b/tests/Unit/Services/Documents/DocumentManualReviewTransitionerTest.php
+new file mode 100644
+index 0000000..7911fdb
+--- /dev/null
++++ b/tests/Unit/Services/Documents/DocumentManualReviewTransitionerTest.php
+@@ -0,0 +1,132 @@
++<?php
++
++declare(strict_types=1);
++
++use App\Enums\DocumentStatus;
++use App\Models\AuditLog;
++use App\Models\Client;
++use App\Models\Document;
++use App\Models\Matter;
++use App\Models\Tenant;
++use App\Models\User;
++use App\Services\Documents\DocumentManualReviewTransitioner;
++use Database\Seeders\RolesAndPermissionsSeeder;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Illuminate\Validation\ValidationException;
++use Spatie\Permission\PermissionRegistrar;
++
++pest()->extend(Tests\TestCase::class)->use(RefreshDatabase::class);
++
++beforeEach(function (): void {
++    (new RolesAndPermissionsSeeder)->run();
++    app(PermissionRegistrar::class)->forgetCachedPermissions();
++});
++
++afterEach(function (): void {
++    setPermissionsTeamId(null);
++    tenancy()->end();
++});
++
++function makeManualReviewContext(string $state = 'readyForReview'): array
++{
++    $tenant = Tenant::factory()->create();
++    $user = User::factory()->forTenant($tenant)->create();
++    $client = Client::factory()->create(['tenant_id' => $tenant->id]);
++    $matter = Matter::factory()->create([
++        'tenant_id' => $tenant->id,
++        'client_id' => $client->id,
++    ]);
++    $document = Document::factory()->{$state}()->create([
++        'tenant_id' => $tenant->id,
++        'matter_id' => $matter->id,
++        'uploaded_by' => $user->id,
++    ]);
++
++    tenancy()->initialize($tenant);
++
++    return [$tenant, $user, $document];
++}
++
++test('transition advances the document via the status transition service and writes an audit log', function (): void {
++    [, $user, $document] = makeManualReviewContext('readyForReview');
++
++    /** @var DocumentManualReviewTransitioner $transitioner */
++    $transitioner = app(DocumentManualReviewTransitioner::class);
++
++    $transitioned = $transitioner->transition(
++        document: $document,
++        toStatus: DocumentStatus::Reviewed,
++        actor: $user,
++        ipAddress: '127.0.0.1',
++        userAgent: 'phpunit',
++    );
++
++    expect($transitioned->status)->toBe(DocumentStatus::Reviewed)
++        ->and($document->fresh()?->status)->toBe(DocumentStatus::Reviewed);
++
++    $log = AuditLog::query()
++        ->where('auditable_type', Document::class)
++        ->where('auditable_id', $document->id)
++        ->where('action', 'reviewed')
++        ->latest('id')
++        ->first();
++
++    expect($log)->not->toBeNull()
++        ->and($log?->user_id)->toBe($user->id)
++        ->and($log?->metadata['ip_address'] ?? null)->toBe('127.0.0.1')
++        ->and($log?->metadata['user_agent'] ?? null)->toBe('phpunit');
++});
++
++test('transition raises ValidationException when the state machine forbids the move', function (): void {
++    [, $user, $document] = makeManualReviewContext('readyForReview');
++
++    /** @var DocumentManualReviewTransitioner $transitioner */
++    $transitioner = app(DocumentManualReviewTransitioner::class);
++
++    expect(fn () => $transitioner->transition(
++        document: $document,
++        toStatus: DocumentStatus::Approved,
++        actor: $user,
++    ))->toThrow(
++        ValidationException::class,
++    );
++
++    expect($document->fresh()?->status)->toBe(DocumentStatus::ReadyForReview);
++});
++
++test('ValidationException carries a status-keyed message describing the rejected transition', function (): void {
++    [, $user, $document] = makeManualReviewContext('readyForReview');
++
++    /** @var DocumentManualReviewTransitioner $transitioner */
++    $transitioner = app(DocumentManualReviewTransitioner::class);
++
++    try {
++        $transitioner->transition(
++            document: $document,
++            toStatus: DocumentStatus::Approved,
++            actor: $user,
++        );
++
++        $this->fail('Expected ValidationException was not thrown.');
++    } catch (ValidationException $exception) {
++        $errors = $exception->errors();
++
++        expect($errors)->toHaveKey('status')
++            ->and($errors['status'][0] ?? null)->toBe('Document cannot transition from [ready_for_review] to [approved].');
++    }
++});
++
++test('transition uses manual-review as the consumer name on the recorded processing event', function (): void {
++    [, $user, $document] = makeManualReviewContext('readyForReview');
++
++    /** @var DocumentManualReviewTransitioner $transitioner */
++    $transitioner = app(DocumentManualReviewTransitioner::class);
++
++    $transitioner->transition(
++        document: $document,
++        toStatus: DocumentStatus::Reviewed,
++        actor: $user,
++    );
++
++    expect($document->processingEvents()->where('consumer_name', 'manual-review')->exists())->toBeTrue();
++});
+diff --git a/tests/Unit/Services/Documents/DocumentReviewerAssignmentServiceTest.php b/tests/Unit/Services/Documents/DocumentReviewerAssignmentServiceTest.php
+new file mode 100644
+index 0000000..034193e
+--- /dev/null
++++ b/tests/Unit/Services/Documents/DocumentReviewerAssignmentServiceTest.php
+@@ -0,0 +1,179 @@
++<?php
++
++declare(strict_types=1);
++
++use App\Events\DocumentStatusUpdated;
++use App\Models\Client;
++use App\Models\Document;
++use App\Models\Matter;
++use App\Models\Tenant;
++use App\Models\User;
++use App\Services\Documents\DocumentReviewerAssignmentService;
++use Database\Seeders\RolesAndPermissionsSeeder;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Illuminate\Support\Facades\Event;
++use Spatie\Permission\PermissionRegistrar;
++
++pest()->extend(Tests\TestCase::class)->use(RefreshDatabase::class);
++
++beforeEach(function (): void {
++    (new RolesAndPermissionsSeeder)->run();
++    app(PermissionRegistrar::class)->forgetCachedPermissions();
++});
++
++afterEach(function (): void {
++    setPermissionsTeamId(null);
++    tenancy()->end();
++});
++
++function makeReviewerAssignmentDocument(): array
++{
++    $tenant = Tenant::factory()->create();
++    $client = Client::factory()->create(['tenant_id' => $tenant->id]);
++    $matter = Matter::factory()->create([
++        'tenant_id' => $tenant->id,
++        'client_id' => $client->id,
++    ]);
++    $document = Document::factory()->readyForReview()->create([
++        'tenant_id' => $tenant->id,
++        'matter_id' => $matter->id,
++    ]);
++
++    return [$tenant, $document];
++}
++
++function makeAssociate(Tenant $tenant, string $name): User
++{
++    $associate = User::factory()->forTenant($tenant)->create(['name' => $name]);
++
++    setPermissionsTeamId($tenant->id);
++    $associate->assignRole('associate');
++    setPermissionsTeamId(null);
++
++    return $associate;
++}
++
++test('availableReviewersForTenant returns only associates of the tenant ordered by name', function (): void {
++    [$tenant] = makeReviewerAssignmentDocument();
++    $alpha = makeAssociate($tenant, 'Avery Associate');
++    $beta = makeAssociate($tenant, 'Morgan Reviewer');
++
++    $partner = User::factory()->forTenant($tenant)->create(['name' => 'Pat Partner']);
++    setPermissionsTeamId($tenant->id);
++    $partner->assignRole('partner');
++    setPermissionsTeamId(null);
++
++    $otherTenant = Tenant::factory()->create();
++    makeAssociate($otherTenant, 'Casey Cross');
++
++    $service = new DocumentReviewerAssignmentService;
++
++    $reviewers = $service->availableReviewersForTenant($tenant->id);
++
++    expect($reviewers)->toBe([
++        ['id' => $alpha->id, 'name' => $alpha->name],
++        ['id' => $beta->id, 'name' => $beta->name],
++    ]);
++});
++
++test('availableReviewersForAssignment delegates to the document tenant', function (): void {
++    [$tenant, $document] = makeReviewerAssignmentDocument();
++    $associate = makeAssociate($tenant, 'Riley Reviewer');
++
++    $service = new DocumentReviewerAssignmentService;
++
++    expect($service->availableReviewersForAssignment($document))
++        ->toBe([['id' => $associate->id, 'name' => $associate->name]]);
++});
++
++test('resolveAssignee returns null for non-numeric values', function (): void {
++    [, $document] = makeReviewerAssignmentDocument();
++
++    $service = new DocumentReviewerAssignmentService;
++
++    expect($service->resolveAssignee(null, $document))->toBeNull()
++        ->and($service->resolveAssignee('', $document))->toBeNull();
++});
++
++test('resolveAssignee scopes lookups to the document tenant', function (): void {
++    [$tenant, $document] = makeReviewerAssignmentDocument();
++    $associate = makeAssociate($tenant, 'Jordan Associate');
++
++    $service = new DocumentReviewerAssignmentService;
++
++    expect($service->resolveAssignee($associate->id, $document)?->id)->toBe($associate->id);
++});
++
++test('resolveAssignee throws when the user belongs to a different tenant', function (): void {
++    [, $document] = makeReviewerAssignmentDocument();
++    $otherTenant = Tenant::factory()->create();
++    $crossTenantUser = User::factory()->forTenant($otherTenant)->create();
++
++    $service = new DocumentReviewerAssignmentService;
++
++    $service->resolveAssignee($crossTenantUser->id, $document);
++})->throws(Illuminate\Database\Eloquent\ModelNotFoundException::class);
++
++test('assign updates the document, refreshes the relation, and broadcasts a status event', function (): void {
++    Event::fake([DocumentStatusUpdated::class]);
++
++    [$tenant, $document] = makeReviewerAssignmentDocument();
++    $associate = makeAssociate($tenant, 'Taylor Associate');
++
++    $service = new DocumentReviewerAssignmentService;
++
++    $result = $service->assign($document, $associate);
++
++    expect($result['changed'])->toBeTrue()
++        ->and($result['previous_assignee_id'])->toBeNull()
++        ->and($result['previous_assignee_name'])->toBeNull()
++        ->and($result['assignee_id'])->toBe($associate->id)
++        ->and($result['assignee_name'])->toBe($associate->name)
++        ->and($result['document']->assigned_to)->toBe($associate->id);
++
++    Event::assertDispatched(DocumentStatusUpdated::class, function (DocumentStatusUpdated $event) use ($document): bool {
++        $payload = $event->broadcastWith();
++
++        return $payload['document_id'] === $document->id
++            && $payload['from_status'] === $payload['to_status'];
++    });
++});
++
++test('assign is a no-op when the assignee is unchanged', function (): void {
++    Event::fake([DocumentStatusUpdated::class]);
++
++    [$tenant, $document] = makeReviewerAssignmentDocument();
++    $associate = makeAssociate($tenant, 'Quinn Associate');
++
++    $document->update(['assigned_to' => $associate->id]);
++
++    $service = new DocumentReviewerAssignmentService;
++
++    $result = $service->assign($document->fresh() ?? $document, $associate);
++
++    expect($result['changed'])->toBeFalse();
++
++    Event::assertNotDispatched(DocumentStatusUpdated::class);
++});
++
++test('assign clears the reviewer when null is passed and previous assignee was set', function (): void {
++    Event::fake([DocumentStatusUpdated::class]);
++
++    [$tenant, $document] = makeReviewerAssignmentDocument();
++    $associate = makeAssociate($tenant, 'Casey Associate');
++
++    $document->update(['assigned_to' => $associate->id]);
++
++    $service = new DocumentReviewerAssignmentService;
++
++    $result = $service->assign($document->fresh() ?? $document, null);
++
++    expect($result['changed'])->toBeTrue()
++        ->and($result['previous_assignee_id'])->toBe($associate->id)
++        ->and($result['previous_assignee_name'])->toBe($associate->name)
++        ->and($result['assignee_id'])->toBeNull()
++        ->and($result['assignee_name'])->toBeNull()
++        ->and($result['document']->assigned_to)->toBeNull();
++
++    Event::assertDispatched(DocumentStatusUpdated::class);
++});
+diff --git a/tests/Unit/Services/Documents/DocumentShowPresenterTest.php b/tests/Unit/Services/Documents/DocumentShowPresenterTest.php
+new file mode 100644
+index 0000000..0bf8067
+--- /dev/null
++++ b/tests/Unit/Services/Documents/DocumentShowPresenterTest.php
+@@ -0,0 +1,146 @@
++<?php
++
++declare(strict_types=1);
++
++use App\Enums\DocumentStatus;
++use App\Models\DocumentClassification;
++use App\Models\ExtractedData;
++use App\Models\ProcessingEvent;
++use App\Services\Documents\DocumentShowPresenter;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Illuminate\Support\Carbon;
++
++pest()->extend(Tests\TestCase::class)->use(RefreshDatabase::class);
++
++test('formatProcessingEvent serialises an event with status fields and ISO timestamp', function (): void {
++    $event = (new ProcessingEvent)->fill([
++        'consumer_name' => 'manual-review',
++        'status_from' => DocumentStatus::ReadyForReview->value,
++        'status_to' => DocumentStatus::Reviewed->value,
++        'event' => 'document.status.transitioned',
++    ]);
++    $event->id = 42;
++    $event->created_at = Carbon::parse('2025-01-15T10:30:00Z');
++
++    $presenter = new DocumentShowPresenter;
++
++    expect($presenter->formatProcessingEvent($event))->toBe([
++        'id' => 42,
++        'consumer_name' => 'manual-review',
++        'status_from' => 'ready_for_review',
++        'status_to' => 'reviewed',
++        'event' => 'document.status.transitioned',
++        'created_at' => '2025-01-15T10:30:00.000000Z',
++    ]);
++});
++
++test('formatProcessingEvent preserves null status_from and status_to', function (): void {
++    $event = (new ProcessingEvent)->fill([
++        'consumer_name' => 'upload-dispatch',
++        'event' => 'document.uploaded',
++    ]);
++    $event->id = 7;
++    $event->status_from = null;
++    $event->status_to = null;
++    $event->created_at = Carbon::parse('2025-02-02T00:00:00Z');
++
++    $presenter = new DocumentShowPresenter;
++
++    $payload = $presenter->formatProcessingEvent($event);
++
++    expect($payload['status_from'])->toBeNull()
++        ->and($payload['status_to'])->toBeNull();
++});
++
++test('formatExtractedData returns null for a missing record', function (): void {
++    $presenter = new DocumentShowPresenter;
++
++    expect($presenter->formatExtractedData(null))->toBeNull();
++});
++
++test('formatExtractedData serialises payload, metadata, and ISO timestamps', function (): void {
++    $extracted = (new ExtractedData)->fill([
++        'provider' => 'openai',
++        'extracted_text' => 'Hello world.',
++        'payload' => ['lines' => ['Hello', 'world']],
++        'metadata' => ['language' => 'en'],
++    ]);
++    $extracted->created_at = Carbon::parse('2025-01-01T00:00:00Z');
++    $extracted->updated_at = Carbon::parse('2025-01-01T01:00:00Z');
++
++    $presenter = new DocumentShowPresenter;
++
++    expect($presenter->formatExtractedData($extracted))->toBe([
++        'provider' => 'openai',
++        'extracted_text' => 'Hello world.',
++        'payload' => ['lines' => ['Hello', 'world']],
++        'metadata' => ['language' => 'en'],
++        'created_at' => '2025-01-01T00:00:00.000000Z',
++        'updated_at' => '2025-01-01T01:00:00.000000Z',
++    ]);
++});
++
++test('formatExtractedData coerces non-array payload and metadata to null', function (): void {
++    $extracted = (new ExtractedData)->fill([
++        'provider' => 'openai',
++        'extracted_text' => null,
++    ]);
++    $extracted->payload = 'not-an-array';
++    $extracted->metadata = null;
++    $extracted->created_at = Carbon::parse('2025-01-01T00:00:00Z');
++    $extracted->updated_at = Carbon::parse('2025-01-01T00:00:00Z');
++
++    $presenter = new DocumentShowPresenter;
++
++    $payload = $presenter->formatExtractedData($extracted);
++
++    expect($payload['payload'])->toBeNull()
++        ->and($payload['metadata'])->toBeNull()
++        ->and($payload['extracted_text'])->toBeNull();
++});
++
++test('formatClassification returns null for a missing record', function (): void {
++    $presenter = new DocumentShowPresenter;
++
++    expect($presenter->formatClassification(null))->toBeNull();
++});
++
++test('formatClassification casts confidence to float and serialises metadata', function (): void {
++    $classification = (new DocumentClassification)->fill([
++        'provider' => 'openai',
++        'type' => 'contract',
++        'confidence' => '0.875',
++        'metadata' => ['rationale' => 'matched headings'],
++    ]);
++    $classification->created_at = Carbon::parse('2025-03-01T12:00:00Z');
++    $classification->updated_at = Carbon::parse('2025-03-01T12:30:00Z');
++
++    $presenter = new DocumentShowPresenter;
++
++    expect($presenter->formatClassification($classification))->toBe([
++        'provider' => 'openai',
++        'type' => 'contract',
++        'confidence' => 0.875,
++        'metadata' => ['rationale' => 'matched headings'],
++        'created_at' => '2025-03-01T12:00:00.000000Z',
++        'updated_at' => '2025-03-01T12:30:00.000000Z',
++    ]);
++});
++
++test('formatClassification preserves a null confidence as null', function (): void {
++    $classification = (new DocumentClassification)->fill([
++        'provider' => 'openai',
++        'type' => 'general',
++        'metadata' => null,
++    ]);
++    $classification->confidence = null;
++    $classification->created_at = Carbon::parse('2025-03-01T12:00:00Z');
++    $classification->updated_at = Carbon::parse('2025-03-01T12:00:00Z');
++
++    $presenter = new DocumentShowPresenter;
++
++    $payload = $presenter->formatClassification($classification);
++
++    expect($payload['confidence'])->toBeNull()
++        ->and($payload['metadata'])->toBeNull();
++});
