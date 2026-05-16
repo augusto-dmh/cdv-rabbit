@@ -35,8 +35,15 @@ class InstallController extends Controller
     /**
      * AC29 — Build a signed state token and redirect the admin's browser to the
      * GitHub App install URL. Only Workspace admins may initiate the flow.
+     *
+     * Uses Inertia::location() because the click usually originates from an
+     * Inertia <Link method="post">: a plain redirect()->away() would be
+     * followed by Inertia's XHR layer and blocked by CORS on github.com.
+     * Inertia::location() returns 409 + X-Inertia-Location for Inertia
+     * requests (client navigates window.location), and a vanilla 302 for
+     * non-Inertia callers — both end up with the browser at github.com.
      */
-    public function start(Request $request, Workspace $workspace, StateTokenSigner $signer): RedirectResponse
+    public function start(Request $request, Workspace $workspace, StateTokenSigner $signer): Response
     {
         if (! $workspace->users()->where('user_id', $request->user()->id)->where('role', 'admin')->exists()) {
             abort(403);
@@ -45,7 +52,7 @@ class InstallController extends Controller
         $token = $signer->sign($workspace->id);
         $slug = (string) config('services.github.app_slug', '');
 
-        return redirect()->away("https://github.com/apps/{$slug}/installations/new?state={$token}");
+        return Inertia::location("https://github.com/apps/{$slug}/installations/new?state={$token}");
     }
 
     /**
