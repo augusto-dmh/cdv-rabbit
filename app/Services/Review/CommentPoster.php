@@ -71,6 +71,7 @@ final class CommentPoster
         DraftReviewDto $draft,
         string $scmRepoId,
         ScmDriverInterface $driver,
+        ?DiffPositionResolver $resolver = null,
     ): void {
         $findings = $draft->findings;
 
@@ -82,12 +83,49 @@ final class CommentPoster
 
         $unresolved = [];
         foreach ($findings as $finding) {
-            if (! $this->tryPostInlineFinding($review, $finding, $scmRepoId, $driver)) {
+            $resolvedFinding = $this->resolveFinding($finding, $resolver);
+
+            if (! $this->tryPostInlineFinding($review, $resolvedFinding, $scmRepoId, $driver)) {
                 $unresolved[] = $finding;
             }
         }
 
         $this->postV2Summary($review, $draft, $scmRepoId, $driver, overflowCount: $overflow, unresolved: $unresolved);
+    }
+
+    /**
+     * Opportunistic pre-flight resolve. When the resolver can correct the
+     * (path, line) — e.g. namespace-cased path "App/..." → filesystem
+     * "app/...", or off-by-a-few line → nearest `+` line within ±5 — apply
+     * the correction. When it can't, pass the Finding through unchanged
+     * and let the SCM-422 fallback in tryPostInlineFinding catch real
+     * unresolvable positions. This keeps the resolver strictly additive:
+     * Findings only get better, never blocked.
+     */
+    private function resolveFinding(ReviewFindingDto $finding, ?DiffPositionResolver $resolver): ReviewFindingDto
+    {
+        if ($resolver === null) {
+            return $finding;
+        }
+
+        $resolved = $resolver->resolve($finding->path, $finding->line);
+
+        if ($resolved === null) {
+            return $finding;
+        }
+
+        if ($resolved['path'] === $finding->path && $resolved['line'] === $finding->line) {
+            return $finding;
+        }
+
+        return new ReviewFindingDto(
+            path: $resolved['path'],
+            line: $resolved['line'],
+            severity: $finding->severity,
+            category: $finding->category,
+            message: $finding->message,
+            suggestion: $finding->suggestion,
+        );
     }
 
     /**

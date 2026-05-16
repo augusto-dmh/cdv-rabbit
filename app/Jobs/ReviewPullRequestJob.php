@@ -26,6 +26,7 @@ use App\Services\Llm\PromptBuilder;
 use App\Services\Review\CommentPoster;
 use App\Services\Review\CostReservationInterface;
 use App\Services\Review\DiffChunker;
+use App\Services\Review\DiffPositionResolver;
 use App\Services\Review\FileDiff;
 use App\Services\Review\SecretRedactor;
 use App\Services\Review\SkipRules;
@@ -568,7 +569,10 @@ class ReviewPullRequestJob implements ShouldQueue
         }
 
         $aggregatedDiff = implode("\n", $aggregatedDiffParts);
-        $userMessage = $promptBuilder->wrap($aggregatedDiff, $prMetadata);
+        // v2 prompt expects every `+` line annotated with its absolute head-side
+        // line number `+[L<N>]` so the LLM doesn't have to count. v1 path stays
+        // un-annotated to honour the AGENTS.md §4 v1 freeze.
+        $userMessage = $promptBuilder->wrap($aggregatedDiff, $prMetadata, annotateLines: true);
 
         $systemPrompt = $llm->getReviewSystemPromptForVersion(ReviewSchemaVersion::V2->value);
         $toolSchema = $llm->getReviewToolSchemaForVersion(ReviewSchemaVersion::V2->value);
@@ -623,7 +627,13 @@ class ReviewPullRequestJob implements ShouldQueue
             ]);
         }
 
-        $commentPoster->postV2($review, $finalDraft, $scmRepoId, $driver);
+        $commentPoster->postV2(
+            $review,
+            $finalDraft,
+            $scmRepoId,
+            $driver,
+            new DiffPositionResolver($fileDiffs),
+        );
 
         $review->update([
             'status' => ReviewStatus::Posted,

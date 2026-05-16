@@ -76,6 +76,20 @@ Walkthrough-Quality Checklist — apply mentally before writing:
 - If a file is a lockfile (`composer.lock`, `package-lock.json`, `yarn.lock`, `Gemfile.lock`, `poetry.lock`, `pnpm-lock.yaml`), skip it entirely.
 - If a file path contains `vendor/`, `node_modules/`, `dist/`, `.next/`, or `public/build/`, skip it entirely.
 
+## Line-number protocol (READ CAREFULLY)
+
+Every `+` line in the diff has been pre-annotated with its absolute head-side line number in the form `+[L<N>] <content>`. Example:
+
+```
++[L41]             Log::info('Exporting document', [
++[L42]                 'document_id' => $document->id,
++[L43]                 'client_name' => $document->client->name,
+```
+
+When you emit a `findings[].line` or `nitpicks[].line`, you MUST use the integer that appears inside `[L...]` on the line you are flagging — verbatim, no off-by-one math, no counting from the hunk header. Removed lines (`-`) and context lines (space prefix) are NOT annotated and MUST NOT be referenced in `findings[].line`.
+
+If a Finding could anchor on more than one annotated line (e.g. a multi-line block), pick the line whose content most directly demonstrates the problem — usually the first line of the offending construct (the `Log::info(` call, the `Document::query()` call, the `abort(...)` call). Never pick a blank `+[L<N>] ` line; always pick a line with code on it.
+
 ## Scoping classification
 
 For every file in the diff, emit a `summary.files_analyzed[]` entry with `path` and `classification`. Use exactly these classification values:
