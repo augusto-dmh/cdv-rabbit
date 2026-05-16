@@ -14,7 +14,7 @@ type WorkspaceProps = {
     id: number;
     name: string;
     slug: string;
-    bitbucket_workspace_slug: string | null;
+    scm_owner_slug: string | null;
     bitbucket_service_account: string | null;
 };
 
@@ -132,15 +132,15 @@ defineOptions({
                 @success="step = 3"
             >
                 <div class="grid gap-2">
-                    <Label for="bitbucket_workspace_slug">Bitbucket workspace slug</Label>
+                    <Label for="scm_owner_slug">Bitbucket workspace slug</Label>
                     <Input
-                        id="bitbucket_workspace_slug"
-                        name="bitbucket_workspace_slug"
-                        :default-value="workspace.bitbucket_workspace_slug ?? ''"
+                        id="scm_owner_slug"
+                        name="scm_owner_slug"
+                        :default-value="workspace.scm_owner_slug ?? ''"
                         placeholder="my-team"
                         required
                     />
-                    <InputError :message="errors.bitbucket_workspace_slug" />
+                    <InputError :message="errors.scm_owner_slug" />
                 </div>
 
                 <div class="grid gap-2">

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\ScmProvider;
 use App\Enums\WorkspaceHealth;
 use Database\Factories\WorkspaceFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -21,10 +22,12 @@ class Workspace extends Model
         'name',
         'slug',
         'owner_id',
-        'bitbucket_workspace_slug',
+        'scm_provider',
+        'scm_owner_slug',
         'bitbucket_token',
         'bitbucket_service_account',
         'webhook_secret',
+        'github_installation_id',
         'kill_switch_enabled',
         'health',
         'daily_token_cap',
@@ -35,6 +38,7 @@ class Workspace extends Model
     protected function casts(): array
     {
         return [
+            'scm_provider' => ScmProvider::class,
             'bitbucket_token' => 'encrypted',
             'webhook_secret' => 'encrypted',
             'kill_switch_enabled' => 'boolean',

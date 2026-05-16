@@ -22,7 +22,7 @@ class ConnectController extends Controller
     public function edit(Workspace $workspace): Response
     {
         return Inertia::render('workspaces/Connect', [
-            'workspace' => $workspace->only('id', 'name', 'slug', 'bitbucket_workspace_slug', 'bitbucket_service_account'),
+            'workspace' => $workspace->only('id', 'name', 'slug', 'scm_owner_slug', 'bitbucket_service_account'),
             'isConnected' => filled($workspace->bitbucket_token),
         ]);
     }
@@ -35,7 +35,7 @@ class ConnectController extends Controller
         $validated = $request->validated();
 
         $workspace->bitbucket_token = $validated['bitbucket_token'];
-        $workspace->bitbucket_workspace_slug = $validated['bitbucket_workspace_slug'];
+        $workspace->scm_owner_slug = $validated['scm_owner_slug'];
         $workspace->bitbucket_service_account = $validated['bitbucket_service_account'];
 
         $client = new BitbucketClient($workspace);

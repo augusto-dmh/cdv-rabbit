@@ -133,7 +133,7 @@ test('duplicate X-Hook-UUID returns 200 without dispatching job', function (): v
     $hookUuid = Str::uuid()->toString();
 
     WebhookDelivery::create([
-        'bitbucket_uuid' => $hookUuid,
+        'scm_delivery_id' => $hookUuid,
         'repository_id' => $this->repository->id,
         'event_type' => 'pullrequest:created',
         'status' => WebhookDeliveryStatus::Dispatched,
@@ -146,7 +146,7 @@ test('duplicate X-Hook-UUID returns 200 without dispatching job', function (): v
     $response->assertJsonFragment(['message' => 'duplicate']);
 
     Queue::assertNothingPushed();
-    expect(WebhookDelivery::where('bitbucket_uuid', $hookUuid)->count())->toBe(1);
+    expect(WebhookDelivery::where('scm_delivery_id', $hookUuid)->count())->toBe(1);
 });
 
 test('non-pullrequest:created event returns 202 without dispatching job', function (): void {

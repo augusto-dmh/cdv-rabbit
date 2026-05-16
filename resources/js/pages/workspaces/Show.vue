@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 type Repository = {
     id: number;
     name: string;
-    full_slug: string;
+    full_name: string;
     default_branch: string;
     enabled: boolean;
     last_synced_at: string | null;
@@ -26,7 +26,7 @@ type Workspace = {
     health: string;
     kill_switch_enabled: boolean;
     llm_provider: string;
-    bitbucket_workspace_slug: string | null;
+    scm_owner_slug: string | null;
     bitbucket_service_account: string | null;
 };
 
@@ -82,7 +82,7 @@ function updateProvider(provider: string): void {
                 <Badge v-else variant="destructive">{{ workspace.health }}</Badge>
             </div>
 
-            <Button v-if="!workspace.bitbucket_workspace_slug" as-child variant="default">
+            <Button v-if="!workspace.scm_owner_slug" as-child variant="default">
                 <Link :href="ConnectController.edit.url(workspace.slug)">Connect Bitbucket</Link>
             </Button>
             <Button v-else as-child variant="outline" size="sm">
@@ -112,7 +112,7 @@ function updateProvider(provider: string): void {
             <CardHeader class="flex flex-row items-center justify-between space-y-0">
                 <CardTitle>Repositories</CardTitle>
                 <Form
-                    v-if="workspace.bitbucket_workspace_slug"
+                    v-if="workspace.scm_owner_slug"
                     v-bind="RepositoryController.sync.form(workspace.slug)"
                     v-slot="{ processing }"
                 >
@@ -124,7 +124,7 @@ function updateProvider(provider: string): void {
             </CardHeader>
             <CardContent>
                 <div v-if="repositories.length === 0" class="py-8 text-center text-sm text-muted-foreground">
-                    <p v-if="!workspace.bitbucket_workspace_slug">
+                    <p v-if="!workspace.scm_owner_slug">
                         Connect your Bitbucket workspace first to discover repositories.
                     </p>
                     <p v-else>No repositories found. Click "Sync repositories" to import from Bitbucket.</p>
@@ -144,7 +144,7 @@ function updateProvider(provider: string): void {
                         <tr v-for="repo in repositories" :key="repo.id" class="border-b last:border-0">
                             <td class="py-3 pr-4 font-medium">
                                 <a
-                                    :href="`https://bitbucket.org/${repo.full_slug}`"
+                                    :href="`https://bitbucket.org/${repo.full_name}`"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     class="flex items-center gap-1 hover:underline"

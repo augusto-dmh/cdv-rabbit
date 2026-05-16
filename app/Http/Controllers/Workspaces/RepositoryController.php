@@ -39,10 +39,10 @@ class RepositoryController extends Controller
 
         foreach ($remoteRepos as $remote) {
             $workspace->repositories()->updateOrCreate(
-                ['bitbucket_uuid' => $remote['uuid']],
+                ['scm_repo_id' => $remote['uuid']],
                 [
                     'name' => $remote['name'],
-                    'full_slug' => $remote['full_name'],
+                    'full_name' => $remote['full_name'],
                     'default_branch' => $remote['mainbranch']['name'] ?? 'main',
                     'last_synced_at' => now(),
                 ],
@@ -89,7 +89,7 @@ class RepositoryController extends Controller
         $webhookUrl = route('bitbucket.webhook', [$repository->id, $webhookToken]);
 
         $result = $client->registerWebhook(
-            $repository->full_slug,
+            $repository->full_name,
             $webhookUrl,
             $workspace->webhook_secret,
             ['pullrequest:created'],
@@ -98,20 +98,20 @@ class RepositoryController extends Controller
         $repository->update([
             'enabled' => true,
             'webhook_token' => $webhookToken,
-            'webhook_uuid' => $result['uuid'] ?? null,
+            'scm_webhook_uuid' => $result['uuid'] ?? null,
         ]);
     }
 
     private function disableRepository(Workspace $workspace, Repository $repository): void
     {
-        if ($repository->webhook_uuid) {
+        if ($repository->scm_webhook_uuid) {
             $client = new BitbucketClient($workspace);
-            $client->deleteWebhook($repository->full_slug, $repository->webhook_uuid);
+            $client->deleteWebhook($repository->full_name, $repository->scm_webhook_uuid);
         }
 
         $repository->update([
             'enabled' => false,
-            'webhook_uuid' => null,
+            'scm_webhook_uuid' => null,
             'webhook_token' => null,
         ]);
     }

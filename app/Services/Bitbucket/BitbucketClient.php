@@ -27,7 +27,7 @@ class BitbucketClient
     {
         $this->token = $workspace->bitbucket_token;
         $this->serviceAccount = $workspace->bitbucket_service_account;
-        $this->workspaceSlug = $workspace->bitbucket_workspace_slug;
+        $this->workspaceSlug = $workspace->scm_owner_slug;
         $this->baseUrl = rtrim((string) config('services.bitbucket.base_url', 'https://api.bitbucket.org/2.0'), '/');
     }
 
@@ -71,7 +71,7 @@ class BitbucketClient
         $this->captureRateLimitHeaders($response);
 
         Log::channel('bitbucket')->info('getRepository', [
-            'full_slug' => $fullSlug,
+            'full_name' => $fullSlug,
             'status' => $response->status(),
         ]);
 
@@ -88,7 +88,7 @@ class BitbucketClient
         $this->captureRateLimitHeaders($response);
 
         Log::channel('bitbucket')->info('getPullRequest', [
-            'full_slug' => $fullSlug,
+            'full_name' => $fullSlug,
             'pr_number' => $prNumber,
             'status' => $response->status(),
         ]);
@@ -106,7 +106,7 @@ class BitbucketClient
         $this->captureRateLimitHeaders($response);
 
         Log::channel('bitbucket')->info('getDiffStat', [
-            'full_slug' => $fullSlug,
+            'full_name' => $fullSlug,
             'pr_number' => $prNumber,
             'status' => $response->status(),
         ]);
@@ -124,7 +124,7 @@ class BitbucketClient
         $this->captureRateLimitHeaders($response);
 
         Log::channel('bitbucket')->info('getDiff', [
-            'full_slug' => $fullSlug,
+            'full_name' => $fullSlug,
             'pr_number' => $prNumber,
             'status' => $response->status(),
         ]);
@@ -144,7 +144,7 @@ class BitbucketClient
         $this->captureRateLimitHeaders($response);
 
         Log::channel('bitbucket')->info('postPullRequestComment', [
-            'full_slug' => $fullSlug,
+            'full_name' => $fullSlug,
             'pr_number' => $prNumber,
             'status' => $response->status(),
         ]);
@@ -164,7 +164,7 @@ class BitbucketClient
         $this->captureRateLimitHeaders($response);
 
         Log::channel('bitbucket')->info('postInlineComment', [
-            'full_slug' => $fullSlug,
+            'full_name' => $fullSlug,
             'pr_number' => $prNumber,
             'path' => $path,
             'line' => $line,
@@ -182,7 +182,7 @@ class BitbucketClient
         $this->captureRateLimitHeaders($response);
 
         Log::channel('bitbucket')->info('updateComment', [
-            'full_slug' => $fullSlug,
+            'full_name' => $fullSlug,
             'pr_number' => $prNumber,
             'comment_id' => $commentId,
             'status' => $response->status(),
@@ -203,7 +203,7 @@ class BitbucketClient
         $this->captureRateLimitHeaders($response);
 
         Log::channel('bitbucket')->info('registerWebhook', [
-            'full_slug' => $fullSlug,
+            'full_name' => $fullSlug,
             'events' => $events,
             'status' => $response->status(),
         ]);
@@ -217,8 +217,8 @@ class BitbucketClient
         $this->captureRateLimitHeaders($response);
 
         Log::channel('bitbucket')->info('deleteWebhook', [
-            'full_slug' => $fullSlug,
-            'webhook_uuid' => $webhookUuid,
+            'full_name' => $fullSlug,
+            'scm_webhook_uuid' => $webhookUuid,
             'status' => $response->status(),
         ]);
 

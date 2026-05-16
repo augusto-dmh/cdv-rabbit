@@ -19,10 +19,10 @@ class RepositoryFactory extends Factory
 
         return [
             'workspace_id' => Workspace::factory(),
-            'bitbucket_uuid' => fake()->uuid(),
+            'scm_repo_id' => fake()->uuid(),
             'name' => $name,
-            'full_slug' => fake()->userName().'/'.$name,
-            'webhook_uuid' => fake()->uuid(),
+            'full_name' => fake()->userName().'/'.$name,
+            'scm_webhook_uuid' => fake()->uuid(),
             'webhook_token' => Str::random(40),
             'default_branch' => 'main',
             'last_synced_at' => null,

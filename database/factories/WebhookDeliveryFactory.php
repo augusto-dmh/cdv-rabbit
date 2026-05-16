@@ -15,7 +15,8 @@ class WebhookDeliveryFactory extends Factory
     public function definition(): array
     {
         return [
-            'bitbucket_uuid' => fake()->uuid(),
+            'scm_delivery_id' => fake()->uuid(),
+            'scm_provider' => 'bitbucket_cloud',
             'repository_id' => null,
             'event_type' => 'pullrequest:created',
             'status' => WebhookDeliveryStatus::Received,

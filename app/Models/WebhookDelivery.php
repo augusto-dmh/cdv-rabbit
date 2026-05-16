@@ -18,7 +18,8 @@ class WebhookDelivery extends Model
     public $timestamps = false;
 
     protected $fillable = [
-        'bitbucket_uuid',
+        'scm_delivery_id',
+        'scm_provider',
         'repository_id',
         'event_type',
         'status',

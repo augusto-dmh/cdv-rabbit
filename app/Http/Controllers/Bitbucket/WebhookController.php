@@ -41,7 +41,7 @@ class WebhookController extends Controller
 
         $hookUuid = $request->header('X-Hook-UUID', '');
 
-        if (WebhookDelivery::where('bitbucket_uuid', $hookUuid)->exists()) {
+        if (WebhookDelivery::where('scm_delivery_id', $hookUuid)->exists()) {
             return response()->json(['message' => 'duplicate'], 200);
         }
 
@@ -51,7 +51,7 @@ class WebhookController extends Controller
 
         $delivery = DB::transaction(function () use ($repository, $hookUuid, $eventKey, $prNumber, $headSha): WebhookDelivery {
             $delivery = WebhookDelivery::create([
-                'bitbucket_uuid' => $hookUuid,
+                'scm_delivery_id' => $hookUuid,
                 'repository_id' => $repository->id,
                 'event_type' => $eventKey,
                 'status' => WebhookDeliveryStatus::Received,

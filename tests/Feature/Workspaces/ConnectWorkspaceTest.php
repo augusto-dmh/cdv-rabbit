@@ -45,7 +45,7 @@ test('update saves token when bitbucket api returns valid account', function ():
 
     $this->actingAs($this->admin)
         ->put(route('workspaces.connect.update', $this->workspace->slug), [
-            'bitbucket_workspace_slug' => 'my-workspace',
+            'scm_owner_slug' => 'my-workspace',
             'bitbucket_token' => str_repeat('x', 20),
             'bitbucket_service_account' => 'svc-acct',
         ])
@@ -54,7 +54,7 @@ test('update saves token when bitbucket api returns valid account', function ():
     $this->workspace->refresh();
 
     expect($this->workspace->bitbucket_service_account)->toBe('svc-acct');
-    expect($this->workspace->bitbucket_workspace_slug)->toBe('my-workspace');
+    expect($this->workspace->scm_owner_slug)->toBe('my-workspace');
     expect($this->workspace->bitbucket_token)->not->toBeNull();
 });
 
@@ -67,7 +67,7 @@ test('token is stored encrypted at rest', function (): void {
 
     $this->actingAs($this->admin)
         ->put(route('workspaces.connect.update', $this->workspace->slug), [
-            'bitbucket_workspace_slug' => 'my-ws',
+            'scm_owner_slug' => 'my-ws',
             'bitbucket_token' => $rawToken,
             'bitbucket_service_account' => 'svc',
         ]);
@@ -87,7 +87,7 @@ test('update returns validation error when bitbucket returns 401', function (): 
 
     $this->actingAs($this->admin)
         ->put(route('workspaces.connect.update', $this->workspace->slug), [
-            'bitbucket_workspace_slug' => 'my-workspace',
+            'scm_owner_slug' => 'my-workspace',
             'bitbucket_token' => str_repeat('x', 20),
             'bitbucket_service_account' => 'svc',
         ])
@@ -101,7 +101,7 @@ test('update returns 403 for non-member', function (): void {
 
     $this->actingAs($nonMember)
         ->put(route('workspaces.connect.update', $this->workspace->slug), [
-            'bitbucket_workspace_slug' => 'ws',
+            'scm_owner_slug' => 'ws',
             'bitbucket_token' => str_repeat('x', 20),
             'bitbucket_service_account' => 'svc',
         ])
@@ -127,7 +127,7 @@ test('destroy clears bitbucket token', function (): void {
 test('update rejects token shorter than 20 characters', function (): void {
     $this->actingAs($this->admin)
         ->put(route('workspaces.connect.update', $this->workspace->slug), [
-            'bitbucket_workspace_slug' => 'ws',
+            'scm_owner_slug' => 'ws',
             'bitbucket_token' => 'short',
             'bitbucket_service_account' => 'svc',
         ])

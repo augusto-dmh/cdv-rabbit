@@ -79,7 +79,7 @@ class ReviewPullRequestJob implements ShouldQueue
         $llm = app(LlmDriverFactory::class)->make($workspace);
         $provider = $workspace->llm_provider;
 
-        $repoFullSlug = $repository->full_slug;
+        $repoFullSlug = $repository->full_name;
 
         $review = Review::firstOrCreate(
             [

@@ -18,10 +18,10 @@ class Repository extends Model
 
     protected $fillable = [
         'workspace_id',
-        'bitbucket_uuid',
+        'scm_repo_id',
         'name',
-        'full_slug',
-        'webhook_uuid',
+        'full_name',
+        'scm_webhook_uuid',
         'webhook_token',
         'default_branch',
         'last_synced_at',

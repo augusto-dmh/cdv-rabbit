@@ -14,7 +14,7 @@ function makeFakeWorkspace(string $token = 'test-token', string $slug = 'my-work
 {
     $workspace = Mockery::mock(Workspace::class)->makePartial();
     $workspace->bitbucket_token = $token;
-    $workspace->bitbucket_workspace_slug = $slug;
+    $workspace->scm_owner_slug = $slug;
     $workspace->bitbucket_service_account = $email;
 
     return $workspace;

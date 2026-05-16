@@ -12,7 +12,7 @@ beforeEach(function (): void {
     $this->admin = User::factory()->create();
     $this->workspace = Workspace::factory()->create([
         'owner_id' => $this->admin->id,
-        'bitbucket_workspace_slug' => 'my-workspace',
+        'scm_owner_slug' => 'my-workspace',
         'bitbucket_token' => str_repeat('t', 32),
         'bitbucket_service_account' => 'svc-acct',
     ]);
@@ -21,16 +21,16 @@ beforeEach(function (): void {
     app(WorkspaceContext::class)->bind($this->workspace->id);
 
     $this->repository = Repository::factory()->forWorkspace($this->workspace)->create([
-        'full_slug' => 'my-workspace/repo-one',
+        'full_name' => 'my-workspace/repo-one',
         'enabled' => false,
-        'webhook_uuid' => null,
+        'scm_webhook_uuid' => null,
         'webhook_token' => null,
     ]);
 
     Http::preventStrayRequests();
 });
 
-test('enable registers webhook and persists webhook_uuid and webhook_token', function (): void {
+test('enable registers webhook and persists scm_webhook_uuid and webhook_token', function (): void {
     Http::fake([
         'api.bitbucket.org/2.0/repositories/my-workspace/repo-one/hooks' => Http::response([
             'uuid' => '{webhook-uuid-abc}',
@@ -47,7 +47,7 @@ test('enable registers webhook and persists webhook_uuid and webhook_token', fun
     $this->repository->refresh();
 
     expect($this->repository->enabled)->toBeTrue();
-    expect($this->repository->webhook_uuid)->toBe('{webhook-uuid-abc}');
+    expect($this->repository->scm_webhook_uuid)->toBe('{webhook-uuid-abc}');
     expect($this->repository->webhook_token)->not->toBeNull();
     expect(strlen($this->repository->webhook_token))->toBe(40);
 });
@@ -55,7 +55,7 @@ test('enable registers webhook and persists webhook_uuid and webhook_token', fun
 test('disable deletes webhook and nulls webhook fields', function (): void {
     $this->repository->update([
         'enabled' => true,
-        'webhook_uuid' => 'abc-webhook-uuid-xyz',
+        'scm_webhook_uuid' => 'abc-webhook-uuid-xyz',
         'webhook_token' => str_repeat('w', 40),
     ]);
 
@@ -73,14 +73,14 @@ test('disable deletes webhook and nulls webhook fields', function (): void {
     $this->repository->refresh();
 
     expect($this->repository->enabled)->toBeFalse();
-    expect($this->repository->webhook_uuid)->toBeNull();
+    expect($this->repository->scm_webhook_uuid)->toBeNull();
     expect($this->repository->webhook_token)->toBeNull();
 });
 
 test('enable is idempotent when repository is already enabled', function (): void {
     $this->repository->update([
         'enabled' => true,
-        'webhook_uuid' => 'existing-uuid-abc',
+        'scm_webhook_uuid' => 'existing-uuid-abc',
         'webhook_token' => str_repeat('e', 40),
     ]);
 
@@ -94,7 +94,7 @@ test('enable is idempotent when repository is already enabled', function (): voi
     app(WorkspaceContext::class)->bind($this->workspace->id);
     $this->repository->refresh();
 
-    expect($this->repository->webhook_uuid)->toBe('existing-uuid-abc');
+    expect($this->repository->scm_webhook_uuid)->toBe('existing-uuid-abc');
 });
 
 test('update returns 403 for non-member', function (): void {

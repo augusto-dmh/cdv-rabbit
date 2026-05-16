@@ -74,7 +74,7 @@ test('pullrequest:created webhook end-to-end: 202 + delivery row + job dispatche
     $response->assertStatus(202);
     $response->assertJsonStructure(['delivery_id']);
 
-    $delivery = WebhookDelivery::where('bitbucket_uuid', $hookUuid)->first();
+    $delivery = WebhookDelivery::where('scm_delivery_id', $hookUuid)->first();
     expect($delivery)->not->toBeNull();
     expect($delivery->status)->toBe(WebhookDeliveryStatus::Dispatched);
     expect($delivery->repository_id)->toBe($this->repository->id);
@@ -104,7 +104,7 @@ test('duplicate delivery: second POST with same X-Hook-UUID returns 200 and does
     $second->assertJsonFragment(['message' => 'duplicate']);
 
     Queue::assertNothingPushed();
-    expect(WebhookDelivery::where('bitbucket_uuid', $hookUuid)->count())->toBe(1);
+    expect(WebhookDelivery::where('scm_delivery_id', $hookUuid)->count())->toBe(1);
 });
 
 test('GET /up returns 200', function (): void {

@@ -27,7 +27,7 @@ class ConnectWorkspaceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'bitbucket_workspace_slug' => ['required', 'string', 'regex:/^[a-z0-9_-]+$/'],
+            'scm_owner_slug' => ['required', 'string', 'regex:/^[a-z0-9_-]+$/'],
             'bitbucket_token' => ['required', 'string', 'min:20'],
             'bitbucket_service_account' => ['required', 'string'],
         ];

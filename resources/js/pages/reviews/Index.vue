@@ -21,7 +21,7 @@ import {
 type Repository = {
     id: number;
     name: string;
-    full_slug: string;
+    full_name: string;
 };
 
 type Review = {
@@ -286,7 +286,7 @@ return;
                         >
                             <td class="px-4 py-3 font-medium">
                                 <a
-                                    :href="`https://bitbucket.org/${review.repository.full_slug}/pull-requests/${review.pull_request_number}`"
+                                    :href="`https://bitbucket.org/${review.repository.full_name}/pull-requests/${review.pull_request_number}`"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     class="flex items-center gap-1 hover:underline"

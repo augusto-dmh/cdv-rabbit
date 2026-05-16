@@ -11,7 +11,7 @@ beforeEach(function (): void {
     $this->admin = User::factory()->create();
     $this->workspace = Workspace::factory()->create([
         'owner_id' => $this->admin->id,
-        'bitbucket_workspace_slug' => 'my-workspace',
+        'scm_owner_slug' => 'my-workspace',
         'bitbucket_token' => str_repeat('t', 32),
         'bitbucket_service_account' => 'svc-acct',
     ]);
@@ -58,7 +58,7 @@ test('sync upserts repositories from bitbucket', function (): void {
 
     expect($repos)->toHaveCount(3);
     expect($repos[0]->name)->toBe('repo-one');
-    expect($repos[0]->full_slug)->toBe('my-workspace/repo-one');
+    expect($repos[0]->full_name)->toBe('my-workspace/repo-one');
     expect($repos[0]->default_branch)->toBe('main');
     expect($repos[0]->last_synced_at)->not->toBeNull();
     expect($repos[1]->name)->toBe('repo-three');
@@ -67,7 +67,7 @@ test('sync upserts repositories from bitbucket', function (): void {
     expect($repos[2]->default_branch)->toBe('develop');
 });
 
-test('sync updates existing repository record by bitbucket_uuid', function (): void {
+test('sync updates existing repository record by scm_repo_id', function (): void {
     Http::fake([
         'api.bitbucket.org/2.0/repositories/my-workspace*' => Http::response([
             'values' => [
@@ -83,9 +83,9 @@ test('sync updates existing repository record by bitbucket_uuid', function (): v
     ]);
 
     $existing = $this->workspace->repositories()->create([
-        'bitbucket_uuid' => '{uuid-existing}',
+        'scm_repo_id' => '{uuid-existing}',
         'name' => 'old-name',
-        'full_slug' => 'my-workspace/old-name',
+        'full_name' => 'my-workspace/old-name',
         'default_branch' => 'main',
         'enabled' => false,
         'last_synced_at' => null,

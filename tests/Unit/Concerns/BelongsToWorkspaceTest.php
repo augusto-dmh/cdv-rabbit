@@ -25,9 +25,9 @@ test('creating a workspace-scoped model without bound context throws when worksp
     // The creating event calls current() only when workspace_id is not set.
     // Provide no workspace_id so the trait tries to auto-fill from context.
     expect(fn () => Repository::create([
-        'bitbucket_uuid' => 'abc-unique-'.uniqid(),
+        'scm_repo_id' => 'abc-unique-'.uniqid(),
         'name' => 'test',
-        'full_slug' => 'org/test-'.uniqid(),
+        'full_name' => 'org/test-'.uniqid(),
         'webhook_token' => 'tok',
         'default_branch' => 'main',
     ]))->toThrow(WorkspaceContextMissingException::class);

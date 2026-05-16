@@ -22,7 +22,7 @@ test('all domain tables exist after migrate:fresh', function (): void {
 
 test('workspaces table has expected columns', function (): void {
     expect(Schema::hasColumns('workspaces', [
-        'id', 'name', 'slug', 'owner_id', 'bitbucket_workspace_slug',
+        'id', 'name', 'slug', 'owner_id', 'scm_owner_slug',
         'bitbucket_token', 'bitbucket_service_account', 'webhook_secret',
         'kill_switch_enabled', 'health', 'created_at', 'updated_at',
     ]))->toBeTrue();
