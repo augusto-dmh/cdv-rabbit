@@ -1,0 +1,44 @@
+{
+  "fixture_id": "docint-pr-28",
+  "pr_summary": "Small targeted fix to make the PdfViewer.vue render reliably: passes cMapUrl + standardFontDataUrl to pdfjs-dist via getDocument(), adds a polyfill for Map.prototype.getOrInsertComputed (pdfjs-dist v5 requirement), wires an npm postinstall to copy cmaps + standard_fonts assets into public/pdfjs/, gitignores that output dir, and adds an ASCII fallback to the Content-Disposition header for the PDF preview endpoint. 6 files / +30 / -4.",
+  "expected_findings": [
+    {
+      "path": "package.json",
+      "line_range": [12, 14],
+      "severity": "medium",
+      "category": "maintainability",
+      "rationale": "npm postinstall scripts run on every install (CI cached layers, Docker multi-stage builds, dev machines) and with shell-level privileges. The chained `mkdir -p public/pdfjs && cp -r ...` will fail silently in environments where node_modules/pdfjs-dist is unexpectedly absent or where /public/ is not yet writable (e.g. Docker BuildKit cache mounts). It is also POSIX-shell-specific — Windows installs without git-bash will fail. Prefer a Vite plugin (e.g. vite-plugin-static-copy) or a dedicated `npm run copy:pdfjs` step invoked from `npm run build`.",
+      "must_find": true
+    },
+    {
+      "path": "resources/js/polyfills.ts",
+      "line_range": [1, 14],
+      "severity": "medium",
+      "category": "maintainability",
+      "rationale": "Monkey-patching Map.prototype (the polyfill adds getOrInsertComputed) without a `if (!Map.prototype.getOrInsertComputed)` guard creates a collision risk with future libraries — or with the native TC39 implementation when browsers ship it. Both branches of the conditional should be considered: skip-if-present (preferred) vs. always-overwrite (current).",
+      "must_find": true
+    },
+    {
+      "path": "resources/js/components/documents/PdfViewer.vue",
+      "line_range": [231, 240],
+      "severity": "low",
+      "category": "maintainability",
+      "rationale": "The cMapUrl and standardFontDataUrl are hardcoded to absolute paths starting at `/pdfjs/...`. If the app is ever served under a subpath (reverse proxy, multi-tenant route prefix), these URLs break silently — pdfjs falls back to glyph-less rendering. Use Laravel's `asset('pdfjs/cmaps/')` via an Inertia shared prop or a Vite-injected base URL.",
+      "must_find": false
+    },
+    {
+      "path": "resources/js/components/documents/PdfViewer.vue",
+      "line_range": [319, 325],
+      "severity": "low",
+      "category": "bug",
+      "rationale": "The renderScale watcher now early-returns when `loading.value` is true. That closes the in-flight race, but leaves a follow-up gap: when loading.value flips back to false, renderScale changes that fired during loading are dropped. Either re-fire the render in onMounted after loading settles, or wrap the load in a queue that replays the latest renderScale once documentHandle is ready.",
+      "must_find": false
+    }
+  ],
+  "expected_walkthrough_mentions": [
+    "targeted fix to pdf rendering",
+    "postinstall script copies pdfjs assets",
+    "Map.prototype polyfill",
+    "small fix-shape PR — narrow scope; few cross-cutting concerns"
+  ]
+}

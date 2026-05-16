@@ -10,7 +10,7 @@ This playbook is the protocol for adding a new fixture without my help. Follow e
 
 | Source repo | Quota | Currently seeded | Notes |
 |---|---|---|---|
-| `augusto-dmh/DocInt` | 5 | 2 (PR #35, PR #31) | The primary review consumer; rich Laravel surface; high signal. |
+| `augusto-dmh/DocInt` | 5 | 3 (PR #35, PR #31, PR #28) | The primary review consumer; rich Laravel surface; high signal. |
 | `augusto-dmh/cdv-rabbit` (this repo) | 3 | 0 | Self-eval: dogfood the reviewer on its own history. |
 | `augusto-dmh/intranet-cdv` | 2 | 0 | Diversity across a larger / older codebase. |
 
@@ -129,12 +129,12 @@ Field semantics:
 
 ## Roadmap
 
-Current seed (2 of 10):
+Current seed (3 of 10):
 - `docint-pr-35` — refactor: extract dashboard aggregations + cross-tenant guard trait (8 files, 233/-110). 4 expected Findings covering trait abort-code info-leak, aggregator N+1 risk, enum back-compat, three-orthogonal-refactors walkthrough concern.
 - `docint-pr-31` — refactor: slim DocumentController via service extraction (20 files, 1785/-513). 5 expected Findings covering transactional boundaries on bulk operations, N+1 in extracted bulk service, authorization-check loss during extraction, presenter eager-loading, form-request sharing.
+- `docint-pr-28` — fix: pdf viewer blank canvas (6 files, 30/-4). 4 expected Findings covering npm postinstall portability, Map.prototype polyfill safety, hardcoded asset URLs vs subpath deploys, race-window in renderScale watcher. **Fix-shape** PR — exercises reviewer behaviour on small targeted changes, distinct from the two large refactor fixtures.
 
 Suggested next fixtures (do not require my involvement — follow the protocol above):
-- `docint-pr-28` — `fix: pdf viewer blank canvas` — narrower fix, JS-heavy diff. Tests reviewer behavior on small targeted changes.
 - `docint-pr-29` — `test: pin architectural seams` — test-only change. Tests that the reviewer correctly produces few/no Findings on test additions.
 - `cdv-rabbit/<commit>` — pick any commit from this repo's main history that you have an opinion on. Self-eval helps catch the reviewer being too lenient on its own code.
 - `intranet-cdv/<commit>` — older Laravel surface. Tests generalisation.
