@@ -142,8 +142,25 @@ class OpenAiReviewAgent implements Agent, HasStructuredOutput
         }
 
         $jsonType = $node['type'] ?? null;
+        $nullable = false;
 
-        return match ($jsonType) {
+        // OpenAI-strict intersection (per ADR 0005 + W7-T2 schemas) encodes nullable
+        // required fields as `{ type: ['X', 'null'] }`. Collapse to the non-null type
+        // and propagate the nullable flag via Type::nullable().
+        if (is_array($jsonType)) {
+            $filtered = array_values(array_diff($jsonType, ['null']));
+            $nullable = count($filtered) < count($jsonType);
+
+            if (count($filtered) !== 1) {
+                throw new InvalidArgumentException(
+                    'OpenAiReviewAgent: nullable JSON Schema union must collapse to exactly one non-null type; got '.var_export($jsonType, true)
+                );
+            }
+
+            $jsonType = $filtered[0];
+        }
+
+        $type = match ($jsonType) {
             'string' => $this->applyStringConstraints($schema->string(), $node),
             'integer' => $this->applyIntegerConstraints($schema->integer(), $node),
             'number' => $this->applyNumberConstraints($schema->number(), $node),
@@ -158,6 +175,8 @@ class OpenAiReviewAgent implements Agent, HasStructuredOutput
                 'OpenAiReviewAgent: unsupported JSON Schema type '.var_export($jsonType, true)
             ),
         };
+
+        return $nullable ? $type->nullable() : $type;
     }
 
     /** @param  array<string, mixed>  $node */
