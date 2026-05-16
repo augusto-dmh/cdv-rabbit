@@ -13,7 +13,6 @@ use App\Models\Review;
 use App\Models\ReviewComment;
 use App\Models\Workspace;
 use App\Queue\BindWorkspaceMiddleware;
-use App\Services\Bitbucket\BitbucketClient;
 use App\Services\Llm\Dto\ReviewCommentDto;
 use App\Services\Llm\Dto\ReviewResultDto;
 use App\Services\Llm\Dto\ReviewSummaryDto;
@@ -26,10 +25,14 @@ use App\Services\Review\CostReservationInterface;
 use App\Services\Review\DiffChunker;
 use App\Services\Review\SecretRedactor;
 use App\Services\Review\SkipRules;
+use App\Services\Scm\Contracts\ScmDriverInterface;
+use App\Services\Scm\Dto\FileChangeDto;
+use App\Services\Scm\ScmDriverFactory;
 use App\Support\RetryDecision;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
@@ -56,7 +59,7 @@ class ReviewPullRequestJob implements ShouldQueue
     }
 
     public function handle(
-        BitbucketClient $bitbucket,
+        ScmDriverFactory $scmFactory,
         CostReservationInterface $costReservation,
         DiffChunker $chunker,
         SecretRedactor $redactor,
@@ -76,10 +79,11 @@ class ReviewPullRequestJob implements ShouldQueue
             return;
         }
 
+        $driver = $scmFactory->make($workspace);
         $llm = app(LlmDriverFactory::class)->make($workspace);
         $provider = $workspace->llm_provider;
 
-        $repoFullSlug = $repository->full_name;
+        $scmRepoId = $repository->scm_repo_id;
 
         $review = Review::firstOrCreate(
             [
@@ -139,9 +143,9 @@ class ReviewPullRequestJob implements ShouldQueue
 
         try {
             // Pre-flight: verify PR is still OPEN and refresh head_sha
-            $prData = $bitbucket->getPullRequest($repoFullSlug, $this->pullRequestNumber);
+            $prData = $driver->getPullRequest($scmRepoId, $this->pullRequestNumber);
 
-            if ($prData === null || ($prData['state'] ?? '') !== 'OPEN') {
+            if ($prData === null || $prData->state !== 'OPEN') {
                 $review->update(['status' => ReviewStatus::Skipped, 'finished_at' => now()]);
                 $costReservation->release($this->workspaceId, $provider, self::COST_RESERVATION_TOKENS);
                 Log::info('ReviewPullRequestJob: PR not open, skipping', ['review_id' => $review->id]);
@@ -150,7 +154,7 @@ class ReviewPullRequestJob implements ShouldQueue
                 return;
             }
 
-            $currentHeadSha = $prData['source']['commit']['hash'] ?? $this->headSha;
+            $currentHeadSha = $prData->headSha !== '' ? $prData->headSha : $this->headSha;
             if ($currentHeadSha !== $this->headSha) {
                 Log::info('ReviewPullRequestJob: head_sha changed since dispatch, continuing with new sha', [
                     'review_id' => $review->id,
@@ -161,17 +165,17 @@ class ReviewPullRequestJob implements ShouldQueue
             }
 
             $prMetadata = [
-                'title' => $prData['title'] ?? '',
-                'branch' => $prData['source']['branch']['name'] ?? '',
-                'author' => $prData['author']['display_name'] ?? '',
+                'title' => $prData->title,
+                'branch' => $prData->sourceBranch,
+                'author' => $prData->authorLogin,
             ];
 
-            // Pre-flight: diffstat size check (AC: diff too large)
-            $rawDiffStat = $bitbucket->getDiffStat($repoFullSlug, $this->pullRequestNumber);
-            $diffStat = $this->aggregateDiffStat($rawDiffStat);
+            // Pre-flight: changed-files size check (AC: diff too large)
+            $changedFiles = $driver->getChangedFiles($scmRepoId, $this->pullRequestNumber);
+            $diffStat = $this->aggregateChangedFiles($changedFiles);
 
             if ($skipRules->isPrTooLarge($diffStat)) {
-                $this->postSkippedSummary($bitbucket, $repoFullSlug, $review, 'This PR is too large to review automatically (> 8 000 changed lines).');
+                $this->postSkippedSummary($driver, $scmRepoId, $review, 'This PR is too large to review automatically (> 8 000 changed lines).');
                 $review->update(['status' => ReviewStatus::Skipped, 'finished_at' => now()]);
                 $costReservation->release($this->workspaceId, $provider, self::COST_RESERVATION_TOKENS);
                 $this->emitReviewLog($review->fresh());
@@ -180,7 +184,7 @@ class ReviewPullRequestJob implements ShouldQueue
             }
 
             // LGPD: diff is a LOCAL variable — never assigned to $this, never logged, never persisted
-            $diff = $bitbucket->getDiff($repoFullSlug, $this->pullRequestNumber);
+            $diff = $driver->getDiff($scmRepoId, $this->pullRequestNumber);
 
             if ($diff === null || trim($diff) === '') {
                 $review->update(['status' => ReviewStatus::Skipped, 'finished_at' => now()]);
@@ -246,8 +250,8 @@ class ReviewPullRequestJob implements ShouldQueue
             // Build aggregated ReviewResultDto for CommentPoster
             $aggregatedResult = $this->buildAggregatedResult($allComments, $totalInputTokens, $totalOutputTokens);
 
-            // AC3: post comments to Bitbucket
-            $commentPoster->post($review, $aggregatedResult, $repoFullSlug);
+            // AC3: post comments via the active SCM driver
+            $commentPoster->post($review, $aggregatedResult, $scmRepoId, $driver);
 
             // Update review to posted
             $review->update([
@@ -262,7 +266,7 @@ class ReviewPullRequestJob implements ShouldQueue
             $this->emitReviewLog($review->fresh());
 
         } catch (LlmReviewException $e) {
-            $this->handleLlmException($e, $review, $bitbucket, $repoFullSlug, $costReservation, $provider);
+            $this->handleLlmException($e, $review, $driver, $scmRepoId, $costReservation, $provider);
         } catch (Throwable $e) {
             $review->update([
                 'status' => ReviewStatus::Failed,
@@ -291,15 +295,15 @@ class ReviewPullRequestJob implements ShouldQueue
     }
 
     private function postSkippedSummary(
-        BitbucketClient $bitbucket,
-        string $repoFullSlug,
+        ScmDriverInterface $driver,
+        string $scmRepoId,
         Review $review,
         string $reason,
     ): void {
         $text = self::ERROR_COMMENT_MARKER.' '.$reason;
 
-        $response = $bitbucket->postPullRequestComment(
-            $repoFullSlug,
+        $handle = $driver->postPullRequestComment(
+            $scmRepoId,
             $this->pullRequestNumber,
             $text,
         );
@@ -309,7 +313,7 @@ class ReviewPullRequestJob implements ShouldQueue
             'workspace_id' => $this->workspaceId,
             'file_path' => null,
             'line' => null,
-            'bitbucket_comment_id' => (string) ($response['id'] ?? null),
+            'bitbucket_comment_id' => $handle->scmCommentId,
             'posted_at' => Carbon::now(),
             'comment_type' => CommentType::Summary,
         ]);
@@ -318,8 +322,8 @@ class ReviewPullRequestJob implements ShouldQueue
     private function handleLlmException(
         LlmReviewException $e,
         Review $review,
-        BitbucketClient $bitbucket,
-        string $repoFullSlug,
+        ScmDriverInterface $driver,
+        string $scmRepoId,
         CostReservationInterface $costReservation,
         string $provider,
     ): void {
@@ -339,14 +343,14 @@ class ReviewPullRequestJob implements ShouldQueue
             $correlationId = $review->id;
             $text = self::ERROR_COMMENT_MARKER." Code review failed (correlation: {$correlationId}). The team has been notified.";
 
-            $response = $bitbucket->postPullRequestComment($repoFullSlug, $this->pullRequestNumber, $text);
+            $handle = $driver->postPullRequestComment($scmRepoId, $this->pullRequestNumber, $text);
 
             ReviewComment::create([
                 'review_id' => $review->id,
                 'workspace_id' => $this->workspaceId,
                 'file_path' => null,
                 'line' => null,
-                'bitbucket_comment_id' => (string) ($response['id'] ?? null),
+                'bitbucket_comment_id' => $handle->scmCommentId,
                 'posted_at' => Carbon::now(),
                 'comment_type' => CommentType::Summary,
             ]);
@@ -402,23 +406,19 @@ class ReviewPullRequestJob implements ShouldQueue
     }
 
     /**
-     * Aggregate Bitbucket diffstat API response into the flat shape expected by SkipRules.
+     * Aggregate the SCM driver's getChangedFiles result into the flat shape expected by SkipRules.
      *
-     * @param  array<string, mixed>|null  $rawDiffStat
+     * @param  Collection<int, FileChangeDto>  $changedFiles
      * @return array{lines_added: int, lines_removed: int}
      */
-    private function aggregateDiffStat(?array $rawDiffStat): array
+    private function aggregateChangedFiles(Collection $changedFiles): array
     {
-        if ($rawDiffStat === null) {
-            return ['lines_added' => 0, 'lines_removed' => 0];
-        }
-
         $linesAdded = 0;
         $linesRemoved = 0;
 
-        foreach ($rawDiffStat['values'] ?? [] as $fileStat) {
-            $linesAdded += (int) ($fileStat['lines_added'] ?? 0);
-            $linesRemoved += (int) ($fileStat['lines_removed'] ?? 0);
+        foreach ($changedFiles as $f) {
+            $linesAdded += $f->linesAdded;
+            $linesRemoved += $f->linesRemoved;
         }
 
         return ['lines_added' => $linesAdded, 'lines_removed' => $linesRemoved];

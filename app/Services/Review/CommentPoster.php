@@ -7,9 +7,11 @@ namespace App\Services\Review;
 use App\Enums\CommentType;
 use App\Models\Review;
 use App\Models\ReviewComment;
-use App\Services\Bitbucket\BitbucketClient;
 use App\Services\Llm\Dto\ReviewCommentDto;
 use App\Services\Llm\Dto\ReviewResultDto;
+use App\Services\Scm\Contracts\ScmDriverInterface;
+use App\Services\Scm\Dto\CommentHandle;
+use App\Services\Scm\Dto\InlineCommentPayload;
 use Illuminate\Support\Carbon;
 
 final class CommentPoster
@@ -19,24 +21,23 @@ final class CommentPoster
     private const AI_MARKER = '🤖 cdv-rabbit (AI generated):';
 
     public function __construct(
-        private readonly BitbucketClient $bitbucket,
         private readonly CommentSanitizer $sanitizer,
     ) {}
 
     /**
-     * Post review results to Bitbucket and persist review_comments rows.
+     * Post review results to the SCM via the active driver and persist review_comments rows.
      * AC5: inline comments capped at 25.
      * AC6: every comment prefixed with AI_MARKER.
      * AC7: existing (path, line) comment rows trigger update-in-place.
      * AC26: empty comments + risk_level=low → summary only.
      */
-    public function post(Review $review, ReviewResultDto $dto, string $repoFullSlug): void
+    public function post(Review $review, ReviewResultDto $dto, string $scmRepoId, ScmDriverInterface $driver): void
     {
         $comments = $dto->comments;
         $isNoIssuesPath = count($comments) === 0 && $dto->summary->riskLevel === 'low';
 
         if ($isNoIssuesPath) {
-            $this->postSummary($review, $dto, $repoFullSlug, overflowCount: 0);
+            $this->postSummary($review, $dto, $scmRepoId, $driver, overflowCount: 0);
 
             return;
         }
@@ -48,16 +49,17 @@ final class CommentPoster
         }
 
         foreach ($comments as $commentDto) {
-            $this->postInlineComment($review, $commentDto, $repoFullSlug);
+            $this->postInlineComment($review, $commentDto, $scmRepoId, $driver);
         }
 
-        $this->postSummary($review, $dto, $repoFullSlug, overflowCount: $overflow);
+        $this->postSummary($review, $dto, $scmRepoId, $driver, overflowCount: $overflow);
     }
 
     private function postInlineComment(
         Review $review,
         ReviewCommentDto $commentDto,
-        string $repoFullSlug,
+        string $scmRepoId,
+        ScmDriverInterface $driver,
     ): void {
         $rawMessage = self::AI_MARKER.' '.$this->sanitizer->sanitize($commentDto->message);
 
@@ -70,10 +72,10 @@ final class CommentPoster
             ->first();
 
         if ($existing !== null) {
-            $this->bitbucket->updateComment(
-                $repoFullSlug,
+            $driver->updateComment(
+                $scmRepoId,
                 $review->pull_request_number,
-                (int) $existing->bitbucket_comment_id,
+                new CommentHandle(scmCommentId: (string) $existing->bitbucket_comment_id),
                 $rawMessage,
             );
 
@@ -82,12 +84,15 @@ final class CommentPoster
             return;
         }
 
-        $response = $this->bitbucket->postInlineComment(
-            $repoFullSlug,
+        $handle = $driver->postInlineComment(
+            $scmRepoId,
             $review->pull_request_number,
-            $rawMessage,
-            $commentDto->path,
-            $commentDto->line,
+            new InlineCommentPayload(
+                body: $rawMessage,
+                path: $commentDto->path,
+                line: $commentDto->line,
+                headSha: (string) $review->head_sha,
+            ),
         );
 
         ReviewComment::create([
@@ -95,7 +100,7 @@ final class CommentPoster
             'workspace_id' => $review->workspace_id,
             'file_path' => $commentDto->path,
             'line' => $commentDto->line,
-            'bitbucket_comment_id' => (string) ($response['id'] ?? null),
+            'bitbucket_comment_id' => $handle->scmCommentId,
             'posted_at' => Carbon::now(),
             'comment_type' => CommentType::Inline,
         ]);
@@ -104,7 +109,8 @@ final class CommentPoster
     private function postSummary(
         Review $review,
         ReviewResultDto $dto,
-        string $repoFullSlug,
+        string $scmRepoId,
+        ScmDriverInterface $driver,
         int $overflowCount,
     ): void {
         $overview = $this->sanitizer->sanitize($dto->summary->overview);
@@ -116,8 +122,8 @@ final class CommentPoster
             $text .= "\n\n_+{$overflowCount} more findings were omitted due to the 25-comment cap. See individual file diffs for full details._";
         }
 
-        $response = $this->bitbucket->postPullRequestComment(
-            $repoFullSlug,
+        $handle = $driver->postPullRequestComment(
+            $scmRepoId,
             $review->pull_request_number,
             $text,
         );
@@ -127,7 +133,7 @@ final class CommentPoster
             'workspace_id' => $review->workspace_id,
             'file_path' => null,
             'line' => null,
-            'bitbucket_comment_id' => (string) ($response['id'] ?? null),
+            'bitbucket_comment_id' => $handle->scmCommentId,
             'posted_at' => Carbon::now(),
             'comment_type' => CommentType::Summary,
         ]);

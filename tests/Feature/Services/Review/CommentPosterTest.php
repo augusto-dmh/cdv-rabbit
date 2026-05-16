@@ -5,14 +5,15 @@ declare(strict_types=1);
 use App\Enums\CommentType;
 use App\Models\Review;
 use App\Models\ReviewComment;
-use App\Services\Bitbucket\BitbucketClient;
 use App\Services\Llm\Dto\ReviewCommentDto;
 use App\Services\Llm\Dto\ReviewResultDto;
 use App\Services\Llm\Dto\ReviewSummaryDto;
 use App\Services\Review\CommentPoster;
 use App\Services\Review\CommentSanitizer;
+use App\Services\Scm\Contracts\ScmDriverInterface;
+use App\Services\Scm\Dto\CommentHandle;
+use App\Services\Scm\Dto\InlineCommentPayload;
 
-// Build a ReviewResultDto with N inline comments.
 function makeReviewResult(int $commentCount = 0, string $riskLevel = 'medium'): ReviewResultDto
 {
     $comments = [];
@@ -39,26 +40,22 @@ function makeReviewResult(int $commentCount = 0, string $riskLevel = 'medium'): 
     );
 }
 
-// Build a CommentPoster with a Mockery-based BitbucketClient mock.
-function makeCommentPoster(?BitbucketClient $client = null): CommentPoster
+function makeCommentPoster(): CommentPoster
 {
-    return new CommentPoster(
-        bitbucket: $client ?? Mockery::mock(BitbucketClient::class),
-        sanitizer: new CommentSanitizer,
-    );
+    return new CommentPoster(sanitizer: new CommentSanitizer);
 }
 
 test('AC26: empty comments + risk_level=low posts only summary comment', function (): void {
     $review = Review::factory()->create(['pull_request_number' => 1]);
     $dto = makeReviewResult(commentCount: 0, riskLevel: 'low');
 
-    $client = Mockery::mock(BitbucketClient::class);
-    $client->shouldReceive('postPullRequestComment')
+    $driver = Mockery::mock(ScmDriverInterface::class);
+    $driver->shouldReceive('postPullRequestComment')
         ->once()
-        ->andReturn(['id' => 101]);
-    $client->shouldReceive('postInlineComment')->never();
+        ->andReturn(new CommentHandle(scmCommentId: '101'));
+    $driver->shouldReceive('postInlineComment')->never();
 
-    makeCommentPoster($client)->post($review, $dto, 'org/repo');
+    makeCommentPoster()->post($review, $dto, 'org/repo', $driver);
 
     $comments = ReviewComment::where('review_id', $review->id)->get();
     expect($comments)->toHaveCount(1)
@@ -70,19 +67,19 @@ test('AC5: 30 comments are capped to 25 inline + 1 summary with overflow note', 
     $dto = makeReviewResult(commentCount: 30, riskLevel: 'high');
 
     $postedSummaries = [];
-    $client = Mockery::mock(BitbucketClient::class);
-    $client->shouldReceive('postInlineComment')
+    $driver = Mockery::mock(ScmDriverInterface::class);
+    $driver->shouldReceive('postInlineComment')
         ->times(25)
-        ->andReturn(['id' => 200]);
-    $client->shouldReceive('postPullRequestComment')
+        ->andReturn(new CommentHandle(scmCommentId: '200'));
+    $driver->shouldReceive('postPullRequestComment')
         ->once()
-        ->andReturnUsing(function ($slug, $pr, $text) use (&$postedSummaries) {
+        ->andReturnUsing(function ($id, $pr, $text) use (&$postedSummaries) {
             $postedSummaries[] = $text;
 
-            return ['id' => 201];
+            return new CommentHandle(scmCommentId: '201');
         });
 
-    makeCommentPoster($client)->post($review, $dto, 'org/repo');
+    makeCommentPoster()->post($review, $dto, 'org/repo', $driver);
 
     $inline = ReviewComment::where('review_id', $review->id)
         ->where('comment_type', CommentType::Inline)
@@ -101,19 +98,19 @@ test('AC6: every inline comment body is prefixed with AI marker', function (): v
     $dto = makeReviewResult(commentCount: 2, riskLevel: 'medium');
 
     $postedBodies = [];
-    $client = Mockery::mock(BitbucketClient::class);
-    $client->shouldReceive('postInlineComment')
+    $driver = Mockery::mock(ScmDriverInterface::class);
+    $driver->shouldReceive('postInlineComment')
         ->twice()
-        ->andReturnUsing(function ($slug, $pr, $text) use (&$postedBodies) {
-            $postedBodies[] = $text;
+        ->andReturnUsing(function ($id, $pr, InlineCommentPayload $payload) use (&$postedBodies) {
+            $postedBodies[] = $payload->body;
 
-            return ['id' => 300];
+            return new CommentHandle(scmCommentId: '300');
         });
-    $client->shouldReceive('postPullRequestComment')
+    $driver->shouldReceive('postPullRequestComment')
         ->once()
-        ->andReturn(['id' => 301]);
+        ->andReturn(new CommentHandle(scmCommentId: '301'));
 
-    makeCommentPoster($client)->post($review, $dto, 'org/repo');
+    makeCommentPoster()->post($review, $dto, 'org/repo', $driver);
 
     foreach ($postedBodies as $body) {
         expect($body)->toContain('🤖 cdv-rabbit (AI generated):');
@@ -125,16 +122,16 @@ test('AC6: summary comment is also prefixed with AI marker', function (): void {
     $dto = makeReviewResult(commentCount: 0, riskLevel: 'low');
 
     $summaryText = null;
-    $client = Mockery::mock(BitbucketClient::class);
-    $client->shouldReceive('postPullRequestComment')
+    $driver = Mockery::mock(ScmDriverInterface::class);
+    $driver->shouldReceive('postPullRequestComment')
         ->once()
-        ->andReturnUsing(function ($slug, $pr, $text) use (&$summaryText) {
+        ->andReturnUsing(function ($id, $pr, $text) use (&$summaryText) {
             $summaryText = $text;
 
-            return ['id' => 400];
+            return new CommentHandle(scmCommentId: '400');
         });
 
-    makeCommentPoster($client)->post($review, $dto, 'org/repo');
+    makeCommentPoster()->post($review, $dto, 'org/repo', $driver);
 
     expect($summaryText)->toContain('🤖 cdv-rabbit (AI generated):');
 });
@@ -154,18 +151,22 @@ test('AC7: existing review_comment row at same path+line triggers update not pos
 
     $dto = makeReviewResult(commentCount: 1, riskLevel: 'medium');
 
-    $client = Mockery::mock(BitbucketClient::class);
-    $client->shouldReceive('updateComment')
+    $driver = Mockery::mock(ScmDriverInterface::class);
+    $driver->shouldReceive('updateComment')
         ->once()
-        ->with('org/repo', 5, 777, Mockery::type('string'));
-    $client->shouldReceive('postInlineComment')->never();
-    $client->shouldReceive('postPullRequestComment')
+        ->withArgs(function ($scmRepoId, $prNumber, CommentHandle $handle, $body): bool {
+            return $scmRepoId === 'org/repo'
+                && $prNumber === 5
+                && $handle->scmCommentId === '777';
+        })
+        ->andReturn(new CommentHandle(scmCommentId: '777'));
+    $driver->shouldReceive('postInlineComment')->never();
+    $driver->shouldReceive('postPullRequestComment')
         ->once()
-        ->andReturn(['id' => 500]);
+        ->andReturn(new CommentHandle(scmCommentId: '500'));
 
-    makeCommentPoster($client)->post($review, $dto, 'org/repo');
+    makeCommentPoster()->post($review, $dto, 'org/repo', $driver);
 
-    // No duplicate inline row created.
     $inline = ReviewComment::where('review_id', $review->id)
         ->where('comment_type', CommentType::Inline)
         ->count();
@@ -196,19 +197,19 @@ test('sanitizer strips @mentions before posting', function (): void {
     );
 
     $postedInline = null;
-    $client = Mockery::mock(BitbucketClient::class);
-    $client->shouldReceive('postInlineComment')
+    $driver = Mockery::mock(ScmDriverInterface::class);
+    $driver->shouldReceive('postInlineComment')
         ->once()
-        ->andReturnUsing(function ($slug, $pr, $text) use (&$postedInline) {
-            $postedInline = $text;
+        ->andReturnUsing(function ($id, $pr, InlineCommentPayload $payload) use (&$postedInline) {
+            $postedInline = $payload->body;
 
-            return ['id' => 600];
+            return new CommentHandle(scmCommentId: '600');
         });
-    $client->shouldReceive('postPullRequestComment')
+    $driver->shouldReceive('postPullRequestComment')
         ->once()
-        ->andReturn(['id' => 601]);
+        ->andReturn(new CommentHandle(scmCommentId: '601'));
 
-    makeCommentPoster($client)->post($review, $dto, 'org/repo');
+    makeCommentPoster()->post($review, $dto, 'org/repo', $driver);
 
     expect($postedInline)->not->toContain('@dev1')
         ->not->toContain('@qa-team');
@@ -218,11 +219,11 @@ test('review_comments rows contain no diff or code content columns', function ()
     $review = Review::factory()->create(['pull_request_number' => 7]);
     $dto = makeReviewResult(commentCount: 1, riskLevel: 'medium');
 
-    $client = Mockery::mock(BitbucketClient::class);
-    $client->shouldReceive('postInlineComment')->once()->andReturn(['id' => 700]);
-    $client->shouldReceive('postPullRequestComment')->once()->andReturn(['id' => 701]);
+    $driver = Mockery::mock(ScmDriverInterface::class);
+    $driver->shouldReceive('postInlineComment')->once()->andReturn(new CommentHandle(scmCommentId: '700'));
+    $driver->shouldReceive('postPullRequestComment')->once()->andReturn(new CommentHandle(scmCommentId: '701'));
 
-    makeCommentPoster($client)->post($review, $dto, 'org/repo');
+    makeCommentPoster()->post($review, $dto, 'org/repo', $driver);
 
     $columns = ReviewComment::where('review_id', $review->id)->get()->map->getAttributes()->toArray();
 

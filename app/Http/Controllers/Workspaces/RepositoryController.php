@@ -8,7 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Workspaces\UpdateRepositoryRequest;
 use App\Models\Repository;
 use App\Models\Workspace;
-use App\Services\Bitbucket\BitbucketClient;
+use App\Services\Scm\Dto\WebhookHandle;
+use App\Services\Scm\ScmDriverFactory;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -34,16 +35,16 @@ class RepositoryController extends Controller
      */
     public function sync(Workspace $workspace): RedirectResponse
     {
-        $client = new BitbucketClient($workspace);
-        $remoteRepos = $client->listRepositories();
+        $driver = app(ScmDriverFactory::class)->make($workspace);
+        $remoteRepos = $driver->listRepositories();
 
         foreach ($remoteRepos as $remote) {
             $workspace->repositories()->updateOrCreate(
-                ['scm_repo_id' => $remote['uuid']],
+                ['scm_repo_id' => $remote->scmRepoId],
                 [
-                    'name' => $remote['name'],
-                    'full_name' => $remote['full_name'],
-                    'default_branch' => $remote['mainbranch']['name'] ?? 'main',
+                    'name' => $remote->name,
+                    'full_name' => $remote->fullName,
+                    'default_branch' => $remote->defaultBranch,
                     'last_synced_at' => now(),
                 ],
             );
@@ -84,29 +85,31 @@ class RepositoryController extends Controller
 
         $webhookToken = Str::random(40);
 
-        $client = new BitbucketClient($workspace);
+        $driver = app(ScmDriverFactory::class)->make($workspace);
 
         $webhookUrl = route('bitbucket.webhook', [$repository->id, $webhookToken]);
 
-        $result = $client->registerWebhook(
-            $repository->full_name,
+        $handle = $driver->registerWebhook(
+            $repository->scm_repo_id,
             $webhookUrl,
             $workspace->webhook_secret,
-            ['pullrequest:created'],
         );
 
         $repository->update([
             'enabled' => true,
             'webhook_token' => $webhookToken,
-            'scm_webhook_uuid' => $result['uuid'] ?? null,
+            'scm_webhook_uuid' => $handle?->scmWebhookUuid,
         ]);
     }
 
     private function disableRepository(Workspace $workspace, Repository $repository): void
     {
         if ($repository->scm_webhook_uuid) {
-            $client = new BitbucketClient($workspace);
-            $client->deleteWebhook($repository->full_name, $repository->scm_webhook_uuid);
+            $driver = app(ScmDriverFactory::class)->make($workspace);
+            $driver->deleteWebhook(
+                $repository->scm_repo_id,
+                new WebhookHandle(scmWebhookUuid: $repository->scm_webhook_uuid),
+            );
         }
 
         $repository->update([

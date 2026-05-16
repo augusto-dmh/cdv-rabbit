@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1778696752870,
+  "lastScanned": 1778897687311,
   "projectRoot": "/home/augusto/projects/cdv-rabbit",
   "techStack": {
     "languages": [
@@ -82,14 +82,14 @@
       "path": "app",
       "purpose": "Application code",
       "fileCount": 0,
-      "lastAccessed": 1778696752854,
+      "lastAccessed": 1778897687277,
       "keyFiles": []
     },
     "bootstrap": {
       "path": "bootstrap",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1778696752855,
+      "lastAccessed": 1778897687279,
       "keyFiles": [
         "app.php",
         "providers.php"
@@ -98,21 +98,21 @@
     "config": {
       "path": "config",
       "purpose": "Configuration files",
-      "fileCount": 12,
-      "lastAccessed": 1778696752861,
+      "fileCount": 15,
+      "lastAccessed": 1778897687294,
       "keyFiles": [
+        "ai.php",
         "app.php",
         "auth.php",
         "cache.php",
-        "database.php",
-        "filesystems.php"
+        "cdv-rabbit.php"
       ]
     },
     "database": {
       "path": "database",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1778696752861,
+      "lastAccessed": 1778897687300,
       "keyFiles": [
         "database.sqlite"
       ]
@@ -120,47 +120,83 @@
     "public": {
       "path": "public",
       "purpose": "Public files",
-      "fileCount": 8,
-      "lastAccessed": 1778696752861,
+      "fileCount": 6,
+      "lastAccessed": 1778897687301,
       "keyFiles": [
         "apple-touch-icon.png",
         "favicon.ico",
         "favicon.svg",
-        "fonts-manifest.dev.json",
-        "hot"
+        "index.php",
+        "robots.txt"
       ]
     },
     "resources": {
       "path": "resources",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778696752861,
+      "lastAccessed": 1778897687301,
       "keyFiles": []
     },
     "routes": {
       "path": "routes",
       "purpose": "Route handlers",
-      "fileCount": 3,
-      "lastAccessed": 1778696752862,
+      "fileCount": 4,
+      "lastAccessed": 1778897687301,
       "keyFiles": [
+        "bitbucket.php",
         "console.php",
         "settings.php",
         "web.php"
+      ]
+    },
+    "specs": {
+      "path": "specs",
+      "purpose": null,
+      "fileCount": 12,
+      "lastAccessed": 1778897687302,
+      "keyFiles": [
+        "ai-code-review-pipeline.md",
+        "bitbucket-cloud-integration.md",
+        "cost-management-and-ceiling-alerts.md",
+        "health-and-readiness-checks.md",
+        "kill-switch-control.md"
+      ]
+    },
+    "state": {
+      "path": "state",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778897687302,
+      "keyFiles": [
+        "cancel-signal-state.json"
       ]
     },
     "storage": {
       "path": "storage",
       "purpose": null,
       "fileCount": 0,
-      "lastAccessed": 1778696752862,
+      "lastAccessed": 1778897687303,
       "keyFiles": []
+    },
+    "stubs": {
+      "path": "stubs",
+      "purpose": "Stub implementations",
+      "fileCount": 4,
+      "lastAccessed": 1778897687303,
+      "keyFiles": [
+        "agent-middleware.stub",
+        "agent.stub",
+        "structured-agent.stub",
+        "tool.stub"
+      ]
     },
     "tests": {
       "path": "tests",
       "purpose": "Test files",
-      "fileCount": 2,
-      "lastAccessed": 1778696752862,
+      "fileCount": 3,
+      "lastAccessed": 1778897687303,
       "keyFiles": [
+        "AcCoverage.md",
         "Pest.php",
         "TestCase.php"
       ]
@@ -169,26 +205,17 @@
       "path": "vendor",
       "purpose": "Third-party code",
       "fileCount": 2,
-      "lastAccessed": 1778696752862,
+      "lastAccessed": 1778897687304,
       "keyFiles": [
         "autoload.php",
         "pest-plugins.json"
       ]
     },
-    "app/Models": {
-      "path": "app/Models",
-      "purpose": "Data models",
-      "fileCount": 1,
-      "lastAccessed": 1778696752862,
-      "keyFiles": [
-        "User.php"
-      ]
-    },
     "database/migrations": {
       "path": "database/migrations",
       "purpose": "Database migrations",
-      "fileCount": 4,
-      "lastAccessed": 1778696752863,
+      "fileCount": 17,
+      "lastAccessed": 1778897687307,
       "keyFiles": [
         "0001_01_01_000000_create_users_table.php",
         "0001_01_01_000001_create_cache_table.php",
@@ -199,7 +226,7 @@
       "path": "public/build",
       "purpose": "Build output",
       "fileCount": 2,
-      "lastAccessed": 1778696752864,
+      "lastAccessed": 1778897687307,
       "keyFiles": [
         "fonts-manifest.json",
         "manifest.json"
@@ -209,7 +236,7 @@
       "path": "resources/views",
       "purpose": "View templates",
       "fileCount": 1,
-      "lastAccessed": 1778696752864,
+      "lastAccessed": 1778897687309,
       "keyFiles": [
         "app.blade.php"
       ]
@@ -217,321 +244,332 @@
     "storage/app": {
       "path": "storage/app",
       "purpose": "Application code",
+      "fileCount": 2,
+      "lastAccessed": 1778897687310,
+      "keyFiles": [
+        "dpo-signoff.json"
+      ]
+    },
+    "tests/Fixtures": {
+      "path": "tests/Fixtures",
+      "purpose": "Test fixtures",
       "fileCount": 1,
-      "lastAccessed": 1778696752864,
-      "keyFiles": []
+      "lastAccessed": 1778897687310,
+      "keyFiles": [
+        "review_result_v1.json"
+      ]
     },
     "vendor/bin": {
       "path": "vendor/bin",
       "purpose": "Executable scripts",
-      "fileCount": 12,
-      "lastAccessed": 1778696752865,
+      "fileCount": 13,
+      "lastAccessed": 1778897687311,
       "keyFiles": [
         "carbon",
-        "paratest",
-        "paratest_for_phpstorm"
+        "jp.php",
+        "paratest"
       ]
     }
   },
   "hotPaths": [
     {
-      "path": "app/Providers/AppServiceProvider.php",
-      "accessCount": 14,
-      "lastAccessed": 1778721179612,
+      "path": "app/Http/Controllers/Workspaces/RepositoryController.php",
+      "accessCount": 7,
+      "lastAccessed": 1778902246676,
       "type": "file"
     },
     {
-      "path": "routes/web.php",
-      "accessCount": 14,
-      "lastAccessed": 1778723614744,
+      "path": "AGENTS.md",
+      "accessCount": 5,
+      "lastAccessed": 1778900119935,
+      "type": "file"
+    },
+    {
+      "path": "app/Services/Bitbucket/BitbucketClient.php",
+      "accessCount": 4,
+      "lastAccessed": 1778901454485,
+      "type": "file"
+    },
+    {
+      "path": "app/Http/Controllers/Workspaces/ConnectController.php",
+      "accessCount": 4,
+      "lastAccessed": 1778902233716,
+      "type": "file"
+    },
+    {
+      "path": "app/Jobs/ReviewPullRequestJob.php",
+      "accessCount": 4,
+      "lastAccessed": 1778902347758,
       "type": "file"
     },
     {
       "path": "app/Models/Workspace.php",
-      "accessCount": 10,
-      "lastAccessed": 1778722618085,
-      "type": "file"
-    },
-    {
-      "path": "app/Models/User.php",
-      "accessCount": 8,
-      "lastAccessed": 1778715737744,
-      "type": "file"
-    },
-    {
-      "path": ".env.example",
-      "accessCount": 7,
-      "lastAccessed": 1778718702994,
-      "type": "file"
-    },
-    {
-      "path": "app/Http/Middleware/HandleInertiaRequests.php",
-      "accessCount": 7,
-      "lastAccessed": 1778722609612,
-      "type": "file"
-    },
-    {
-      "path": "tests/Unit/Queue/RedactingFailedJobProviderTest.php",
-      "accessCount": 6,
-      "lastAccessed": 1778719622152,
-      "type": "file"
-    },
-    {
-      "path": "app/Concerns/WorkspaceContext.php",
-      "accessCount": 6,
-      "lastAccessed": 1778720603103,
-      "type": "file"
-    },
-    {
-      "path": "tests/Pest.php",
-      "accessCount": 5,
-      "lastAccessed": 1778713658614,
-      "type": "file"
-    },
-    {
-      "path": "database/factories/WorkspaceFactory.php",
-      "accessCount": 5,
-      "lastAccessed": 1778720598358,
-      "type": "file"
-    },
-    {
-      "path": "app/Models/Review.php",
-      "accessCount": 5,
-      "lastAccessed": 1778722590969,
-      "type": "file"
-    },
-    {
-      "path": "config/queue.php",
-      "accessCount": 4,
-      "lastAccessed": 1778710225356,
-      "type": "file"
-    },
-    {
-      "path": "app/Queue/RedactingFailedJobProvider.php",
-      "accessCount": 4,
-      "lastAccessed": 1778710964649,
-      "type": "file"
-    },
-    {
-      "path": "database/migrations/2026_05_13_000001_create_workspaces_table.php",
-      "accessCount": 4,
-      "lastAccessed": 1778715828811,
-      "type": "file"
-    },
-    {
-      "path": "database/migrations/2026_05_13_000003_create_repositories_table.php",
-      "accessCount": 4,
-      "lastAccessed": 1778716591071,
-      "type": "file"
-    },
-    {
-      "path": "phpunit.xml",
-      "accessCount": 4,
-      "lastAccessed": 1778719602879,
-      "type": "file"
-    },
-    {
-      "path": "tests/Unit/Concerns/WorkspaceContextTest.php",
       "accessCount": 3,
-      "lastAccessed": 1778710583786,
+      "lastAccessed": 1778900866127,
       "type": "file"
     },
     {
-      "path": "config/logging.php",
+      "path": "resources/js/pages/workspaces/Show.vue",
       "accessCount": 3,
-      "lastAccessed": 1778713511140,
+      "lastAccessed": 1778901486049,
       "type": "file"
     },
     {
-      "path": "app/Concerns/BelongsToWorkspace.php",
-      "accessCount": 3,
-      "lastAccessed": 1778715750818,
+      "path": "CONTEXT.md",
+      "accessCount": 2,
+      "lastAccessed": 1778898564297,
       "type": "file"
     },
     {
-      "path": "database/migrations/2026_05_13_000007_create_reviews_llm_calls_table.php",
-      "accessCount": 3,
-      "lastAccessed": 1778717823010,
+      "path": "specs/multi-scm-provider-support.md",
+      "accessCount": 2,
+      "lastAccessed": 1778899926403,
       "type": "file"
     },
     {
-      "path": "database/migrations/2026_05_13_000005_create_review_comments_table.php",
-      "accessCount": 3,
-      "lastAccessed": 1778717823319,
+      "path": ".claude/settings.local.json",
+      "accessCount": 2,
+      "lastAccessed": 1778900507110,
       "type": "file"
     },
     {
       "path": "app/Models/Repository.php",
-      "accessCount": 3,
-      "lastAccessed": 1778720569573,
-      "type": "file"
-    },
-    {
-      "path": "app/Http/Controllers/Settings/ProfileController.php",
-      "accessCount": 3,
-      "lastAccessed": 1778722548038,
-      "type": "file"
-    },
-    {
-      "path": "app/Models/ReviewsLlmCall.php",
-      "accessCount": 3,
-      "lastAccessed": 1778722558205,
-      "type": "file"
-    },
-    {
-      "path": "app/Enums/ReviewStatus.php",
-      "accessCount": 3,
-      "lastAccessed": 1778722558234,
-      "type": "file"
-    },
-    {
-      "path": "app/Models/ReviewComment.php",
-      "accessCount": 3,
-      "lastAccessed": 1778722632005,
-      "type": "file"
-    },
-    {
-      "path": "config/fortify.php",
       "accessCount": 2,
-      "lastAccessed": 1778703881717,
-      "type": "file"
-    },
-    {
-      "path": "config/database.php",
-      "accessCount": 2,
-      "lastAccessed": 1778710119686,
-      "type": "file"
-    },
-    {
-      "path": "composer.json",
-      "accessCount": 2,
-      "lastAccessed": 1778710120108,
-      "type": "file"
-    },
-    {
-      "path": "config/horizon.php",
-      "accessCount": 2,
-      "lastAccessed": 1778710218842,
-      "type": "file"
-    },
-    {
-      "path": "database/migrations/2026_05_13_000002_create_workspace_user_table.php",
-      "accessCount": 2,
-      "lastAccessed": 1778710419789,
-      "type": "file"
-    },
-    {
-      "path": "database/migrations/2026_05_13_000004_create_reviews_table.php",
-      "accessCount": 2,
-      "lastAccessed": 1778710427552,
-      "type": "file"
-    },
-    {
-      "path": "database/migrations/2026_05_13_000006_create_webhook_deliveries_table.php",
-      "accessCount": 2,
-      "lastAccessed": 1778710433713,
-      "type": "file"
-    },
-    {
-      "path": "app/Events/RedactionApplied.php",
-      "accessCount": 2,
-      "lastAccessed": 1778710932364,
+      "lastAccessed": 1778900871570,
       "type": "file"
     },
     {
       "path": "app/Models/WebhookDelivery.php",
       "accessCount": 2,
-      "lastAccessed": 1778713593807,
+      "lastAccessed": 1778900878361,
       "type": "file"
     },
     {
-      "path": "app/Enums/WebhookDeliveryStatus.php",
+      "path": "database/factories/WorkspaceFactory.php",
       "accessCount": 2,
-      "lastAccessed": 1778713598183,
+      "lastAccessed": 1778900895784,
       "type": "file"
     },
     {
-      "path": "routes/settings.php",
+      "path": "database/factories/RepositoryFactory.php",
       "accessCount": 2,
-      "lastAccessed": 1778714078514,
+      "lastAccessed": 1778900904073,
       "type": "file"
     },
     {
-      "path": "app/Enums/LlmCallRole.php",
+      "path": "database/factories/WebhookDeliveryFactory.php",
       "accessCount": 2,
-      "lastAccessed": 1778720579388,
+      "lastAccessed": 1778900910867,
       "type": "file"
     },
     {
-      "path": "app/Providers/FortifyServiceProvider.php",
-      "accessCount": 1,
-      "lastAccessed": 1778698394919,
+      "path": "app/Http/Requests/Workspaces/ConnectWorkspaceRequest.php",
+      "accessCount": 2,
+      "lastAccessed": 1778901449131,
       "type": "file"
     },
     {
-      "path": "vite.config.ts",
-      "accessCount": 1,
-      "lastAccessed": 1778698399616,
+      "path": "app/Http/Controllers/Bitbucket/WebhookController.php",
+      "accessCount": 2,
+      "lastAccessed": 1778901466327,
       "type": "file"
     },
     {
-      "path": "package.json",
-      "accessCount": 1,
-      "lastAccessed": 1778698399694,
+      "path": "resources/js/pages/workspaces/Connect.vue",
+      "accessCount": 2,
+      "lastAccessed": 1778901483555,
       "type": "file"
     },
     {
-      "path": "components.json",
-      "accessCount": 1,
-      "lastAccessed": 1778698401920,
+      "path": "resources/js/pages/reviews/Index.vue",
+      "accessCount": 2,
+      "lastAccessed": 1778901487105,
       "type": "file"
     },
     {
-      "path": "eslint.config.js",
-      "accessCount": 1,
-      "lastAccessed": 1778698402096,
+      "path": "resources/js/pages/reviews/Show.vue",
+      "accessCount": 2,
+      "lastAccessed": 1778901488292,
       "type": "file"
     },
     {
-      "path": "app/Http/Controllers/Settings/SecurityController.php",
-      "accessCount": 1,
-      "lastAccessed": 1778703883196,
+      "path": "app/Services/Review/CommentPoster.php",
+      "accessCount": 2,
+      "lastAccessed": 1778902364234,
       "type": "file"
     },
     {
-      "path": "tests/Feature/DashboardTest.php",
-      "accessCount": 1,
-      "lastAccessed": 1778710178276,
+      "path": "tests/Unit/Services/Scm/BitbucketDriverTest.php",
+      "accessCount": 2,
+      "lastAccessed": 1778902556725,
       "type": "file"
     },
     {
-      "path": "tests/TestCase.php",
+      "path": "specs/bitbucket-cloud-integration.md",
       "accessCount": 1,
-      "lastAccessed": 1778710259650,
+      "lastAccessed": 1778897990689,
       "type": "file"
     },
     {
-      "path": "app/Exceptions/WorkspaceContextMissingException.php",
+      "path": "specs/multi-llm-provider-support.md",
       "accessCount": 1,
-      "lastAccessed": 1778710304972,
+      "lastAccessed": 1778898009782,
+      "type": "file"
+    },
+    {
+      "path": "docs/adr/0001-strict-1-to-1-workspace-and-scm-owner.md",
+      "accessCount": 1,
+      "lastAccessed": 1778898724944,
+      "type": "file"
+    },
+    {
+      "path": "docs/adr/0002-github-app-as-github-scm-auth-model.md",
+      "accessCount": 1,
+      "lastAccessed": 1778898730541,
+      "type": "file"
+    },
+    {
+      "path": "docs/adr/0003-per-provider-webhook-controllers-and-asymmetric-hmac.md",
+      "accessCount": 1,
+      "lastAccessed": 1778898878796,
+      "type": "file"
+    },
+    {
+      "path": "docs/adr/0004-scm-driver-interface-shape.md",
+      "accessCount": 1,
+      "lastAccessed": 1778899011660,
+      "type": "file"
+    },
+    {
+      "path": "database/migrations/2026_05_13_000003_create_repositories_table.php",
+      "accessCount": 1,
+      "lastAccessed": 1778899032026,
+      "type": "file"
+    },
+    {
+      "path": "database/migrations/2026_05_13_000006_create_webhook_deliveries_table.php",
+      "accessCount": 1,
+      "lastAccessed": 1778899033053,
+      "type": "file"
+    },
+    {
+      "path": "database/migrations/2026_05_13_000001_create_workspaces_table.php",
+      "accessCount": 1,
+      "lastAccessed": 1778899033538,
+      "type": "file"
+    },
+    {
+      "path": "phpunit.xml",
+      "accessCount": 1,
+      "lastAccessed": 1778900633804,
       "type": "file"
     },
     {
       "path": "app/Enums/WorkspaceHealth.php",
       "accessCount": 1,
-      "lastAccessed": 1778710783453,
+      "lastAccessed": 1778900712161,
       "type": "file"
     },
     {
-      "path": "app/Enums/CommentType.php",
+      "path": "app/Enums/ScmProvider.php",
       "accessCount": 1,
-      "lastAccessed": 1778710785368,
+      "lastAccessed": 1778900825473,
       "type": "file"
     },
     {
-      "path": "database/factories/UserFactory.php",
+      "path": "database/migrations/2026_05_16_000001_add_scm_columns_to_workspaces.php",
       "accessCount": 1,
-      "lastAccessed": 1778710817699,
+      "lastAccessed": 1778900832631,
+      "type": "file"
+    },
+    {
+      "path": "database/migrations/2026_05_16_000002_rename_columns_on_repositories.php",
+      "accessCount": 1,
+      "lastAccessed": 1778900839501,
+      "type": "file"
+    },
+    {
+      "path": "database/migrations/2026_05_16_000003_rename_and_add_columns_on_webhook_deliveries.php",
+      "accessCount": 1,
+      "lastAccessed": 1778900845438,
+      "type": "file"
+    },
+    {
+      "path": "app/Services/Scm/Contracts/ScmDriverInterface.php",
+      "accessCount": 1,
+      "lastAccessed": 1778901925828,
+      "type": "file"
+    },
+    {
+      "path": "app/Services/Scm/Dto/RepositoryDto.php",
+      "accessCount": 1,
+      "lastAccessed": 1778901927786,
+      "type": "file"
+    },
+    {
+      "path": "app/Services/Scm/Dto/PullRequestDto.php",
+      "accessCount": 1,
+      "lastAccessed": 1778901929857,
+      "type": "file"
+    },
+    {
+      "path": "app/Services/Scm/Dto/FileChangeDto.php",
+      "accessCount": 1,
+      "lastAccessed": 1778901931314,
+      "type": "file"
+    },
+    {
+      "path": "app/Services/Scm/Dto/InlineCommentPayload.php",
+      "accessCount": 1,
+      "lastAccessed": 1778901932691,
+      "type": "file"
+    },
+    {
+      "path": "app/Services/Scm/Dto/CommentHandle.php",
+      "accessCount": 1,
+      "lastAccessed": 1778901934782,
+      "type": "file"
+    },
+    {
+      "path": "app/Services/Scm/Dto/WebhookHandle.php",
+      "accessCount": 1,
+      "lastAccessed": 1778901936810,
+      "type": "file"
+    },
+    {
+      "path": "app/Services/Scm/Dto/CredentialCheck.php",
+      "accessCount": 1,
+      "lastAccessed": 1778901937840,
+      "type": "file"
+    },
+    {
+      "path": "app/Services/Scm/Exceptions/UnsupportedScmProviderException.php",
+      "accessCount": 1,
+      "lastAccessed": 1778901939236,
+      "type": "file"
+    },
+    {
+      "path": "app/Services/Scm/ScmDriverFactory.php",
+      "accessCount": 1,
+      "lastAccessed": 1778901942857,
+      "type": "file"
+    },
+    {
+      "path": "tests/Unit/Services/Scm/ScmDriverFactoryTest.php",
+      "accessCount": 1,
+      "lastAccessed": 1778901945238,
+      "type": "file"
+    },
+    {
+      "path": "tests/Unit/Services/Bitbucket/BitbucketClientTest.php",
+      "accessCount": 1,
+      "lastAccessed": 1778902090097,
+      "type": "file"
+    },
+    {
+      "path": "app/Services/Scm/BitbucketDriver.php",
+      "accessCount": 1,
+      "lastAccessed": 1778902154976,
       "type": "file"
     }
   ],

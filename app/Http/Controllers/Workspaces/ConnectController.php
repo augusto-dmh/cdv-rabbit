@@ -7,7 +7,7 @@ namespace App\Http\Controllers\Workspaces;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Workspaces\ConnectWorkspaceRequest;
 use App\Models\Workspace;
-use App\Services\Bitbucket\BitbucketClient;
+use App\Services\Scm\ScmDriverFactory;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -38,19 +38,12 @@ class ConnectController extends Controller
         $workspace->scm_owner_slug = $validated['scm_owner_slug'];
         $workspace->bitbucket_service_account = $validated['bitbucket_service_account'];
 
-        $client = new BitbucketClient($workspace);
+        $driver = app(ScmDriverFactory::class)->make($workspace);
+        $check = $driver->verifyCredentials();
 
-        try {
-            $me = $client->me();
-        } catch (\RuntimeException $e) {
+        if (! $check->valid) {
             return back()->withErrors([
-                'bitbucket_token' => $e->getMessage(),
-            ]);
-        }
-
-        if (empty($me['account_id'])) {
-            return back()->withErrors([
-                'bitbucket_token' => __('Token is invalid or missing required Bitbucket scopes.'),
+                'bitbucket_token' => $check->reason ?? __('Token is invalid or missing required Bitbucket scopes.'),
             ]);
         }
 
