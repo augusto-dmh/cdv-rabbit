@@ -1,0 +1,53 @@
+{
+  "fixture_id": "docint-pr-30",
+  "pr_summary": "Removes ad-hoc ensureCurrentTenant* helper methods from DocumentController and DocumentCommentController, deletes ~50 lines of inline tenant guards, and centralises tenant context via a middleware priority list entry in bootstrap/app.php (InitializeTenantContext runs before SubstituteBindings so the BelongsToTenant global scope is active when route-model binding queries the DB). Adds a phpunit Architecture testsuite, a controller arch rule preventing reintroduction of the helpers, and a TenantScopeTest unit test verifying Document::find returns null for foreign-tenant ids. 6 files / +84 / -50.",
+  "expected_findings": [
+    {
+      "path": "bootstrap/app.php",
+      "line_range": [29, 38],
+      "severity": "high",
+      "category": "security",
+      "rationale": "The whole refactor's correctness hinges on InitializeTenantContext running before SubstituteBindings so the global tenant scope is bound when Laravel resolves {document} → Document::find($id). The PR uses prependToPriorityList(before: SubstituteBindings::class, prepend: InitializeTenantContext::class) — reviewer must verify this also covers (a) routes that are NOT in the 'web' group (e.g. API routes hitting these controllers, scheduled commands, queued jobs that re-resolve models), and (b) the middleware is actually attached to every route group that previously relied on the helpers. If any controller method is reachable via a route group that doesn't include 'tenant' alias / the priority list isn't honoured, deleting the helpers silently regresses to cross-tenant access. The deleted ensureCurrentTenant* methods were defense-in-depth; centralising them removes the second check.",
+      "must_find": true
+    },
+    {
+      "path": "tests/Unit/Models/TenantScopeTest.php",
+      "line_range": [1, 52],
+      "severity": "medium",
+      "category": "maintainability",
+      "rationale": "The new TenantScopeTest only covers Document. The deleted helpers also guarded Matter (DocumentController::create/store via ensureCurrentTenantMatter) and DocumentComment (DocumentCommentController::update/destroy via ensureCurrentTenantDocumentComment). Without parallel scope tests on Matter and DocumentComment, the safety net is asymmetric — a future model that should be tenant-scoped but isn't would pass this suite. Add equivalent ::find-returns-null-for-foreign-tenant tests for every model that previously had an ad-hoc helper.",
+      "must_find": true
+    },
+    {
+      "path": "tests/Architecture/ArchitecturalRulesTest.php",
+      "line_range": [44, 67],
+      "severity": "medium",
+      "category": "maintainability",
+      "rationale": "The 'controllers do not reintroduce ad-hoc tenant scoping helpers' arch rule uses preg_match('/ensureCurrentTenant\\w*/'). This only catches the historical helper name pattern. A reviewer would flag that the rule won't catch other ad-hoc forms (manual `abort_unless($model->tenant_id === tenant()?->id, 404)`, `if ($x->tenant_id !== ...)`, `Matter::withoutGlobalScope(...)`) that bypass the global scope. Prefer asserting on the *behaviour* (e.g. no controller string-matches `tenant_id !==` or `->tenant_id ===`) so reintroduction via a renamed helper is still flagged.",
+      "must_find": true
+    },
+    {
+      "path": "app/Http/Controllers/DocumentCommentController.php",
+      "line_range": [75, 130],
+      "severity": "medium",
+      "category": "security",
+      "rationale": "The deleted ensureCurrentTenantDocumentComment also asserted $comment->document_id === $document->id — a parent/child consistency check that the BelongsToTenant global scope does NOT replace. After this refactor, a request like PATCH /documents/{A}/comments/{B} where comment B belongs to a different document A' in the SAME tenant will now succeed where it previously 404'd. Reviewer should require either a FormRequest authorize() check on document-comment consistency, or restoration of that specific parent/child guard.",
+      "must_find": true
+    },
+    {
+      "path": "phpunit.xml",
+      "line_range": [14, 16],
+      "severity": "low",
+      "category": "maintainability",
+      "rationale": "Architecture testsuite was added but the default `php artisan test` invocation only runs Unit and Feature by default unless --testsuite is omitted. Verify CI is configured to include the new testsuite (or the default phpunit invocation runs all three). Otherwise the new arch rule is dead-weight insurance — it exists but never runs.",
+      "must_find": false
+    }
+  ],
+  "expected_walkthrough_mentions": [
+    "centralises tenant scoping via middleware priority",
+    "deletes ad-hoc ensureCurrentTenant* helpers",
+    "correctness hinges on middleware running before SubstituteBindings",
+    "second-defense check removed",
+    "arch rule prevents reintroduction"
+  ]
+}

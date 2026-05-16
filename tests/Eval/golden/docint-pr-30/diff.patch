@@ -1,0 +1,290 @@
+diff --git a/app/Http/Controllers/DocumentCommentController.php b/app/Http/Controllers/DocumentCommentController.php
+index 6448cbb..32d39b7 100644
+--- a/app/Http/Controllers/DocumentCommentController.php
++++ b/app/Http/Controllers/DocumentCommentController.php
+@@ -17,7 +17,6 @@ class DocumentCommentController extends Controller
+ {
+     public function index(Request $request, Document $document): JsonResponse
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('view', $document);
+ 
+         return response()->json([
+@@ -32,7 +31,6 @@ public function index(Request $request, Document $document): JsonResponse
+ 
+     public function store(StoreDocumentCommentRequest $request, Document $document): JsonResponse
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('view', $document);
+         $this->authorize('comment', $document);
+ 
+@@ -75,8 +73,6 @@ public function update(
+         Document $document,
+         DocumentComment $comment,
+     ): JsonResponse {
+-        $document = $this->ensureCurrentTenantDocument($document);
+-        $comment = $this->ensureCurrentTenantDocumentComment($document, $comment);
+         $this->authorize('view', $document);
+         $this->authorize('comment', $document);
+ 
+@@ -115,8 +111,6 @@ public function destroy(
+         Document $document,
+         DocumentComment $comment,
+     ): JsonResponse {
+-        $document = $this->ensureCurrentTenantDocument($document);
+-        $comment = $this->ensureCurrentTenantDocumentComment($document, $comment);
+         $this->authorize('view', $document);
+ 
+         /** @var User $user */
+@@ -156,26 +150,6 @@ public function destroy(
+         ]);
+     }
+ 
+-    protected function ensureCurrentTenantDocument(Document $document): Document
+-    {
+-        abort_unless($document->tenant_id === tenant()?->id, 404);
+-
+-        return $document;
+-    }
+-
+-    protected function ensureCurrentTenantDocumentComment(
+-        Document $document,
+-        DocumentComment $comment,
+-    ): DocumentComment {
+-        abort_unless(
+-            $comment->tenant_id === $document->tenant_id
+-                && $comment->document_id === $document->id,
+-            404,
+-        );
+-
+-        return $comment;
+-    }
+-
+     protected function resolveParentComment(mixed $parentId, Document $document): ?DocumentComment
+     {
+         if (! is_numeric($parentId)) {
+diff --git a/app/Http/Controllers/DocumentController.php b/app/Http/Controllers/DocumentController.php
+index 29a57c5..18f6de6 100644
+--- a/app/Http/Controllers/DocumentController.php
++++ b/app/Http/Controllers/DocumentController.php
+@@ -66,7 +66,6 @@ public function index(Request $request): Response
+ 
+     public function create(Matter $matter): Response
+     {
+-        $matter = $this->ensureCurrentTenantMatter($matter);
+         $this->authorize('create', Document::class);
+ 
+         return Inertia::render('documents/Create', [
+@@ -77,7 +76,6 @@ public function create(Matter $matter): Response
+ 
+     public function store(StoreDocumentRequest $request, Matter $matter): RedirectResponse
+     {
+-        $matter = $this->ensureCurrentTenantMatter($matter);
+         $this->authorize('create', Document::class);
+ 
+         /** @var \Illuminate\Http\UploadedFile $file */
+@@ -98,7 +96,6 @@ public function store(StoreDocumentRequest $request, Matter $matter): RedirectRe
+ 
+     public function preview(Document $document): StreamedResponse
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('view', $document);
+ 
+         abort_unless(DocumentReviewWorkspacePresenter::supportsInlinePreview($document), 404);
+@@ -135,7 +132,6 @@ public function preview(Document $document): StreamedResponse
+ 
+     public function show(Request $request, Document $document): Response
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('view', $document);
+ 
+         if (! $this->isRealtimeRefresh($request)) {
+@@ -197,7 +193,6 @@ public function show(Request $request, Document $document): Response
+ 
+     public function edit(Document $document): Response
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('update', $document);
+ 
+         return Inertia::render('documents/Edit', [
+@@ -240,7 +235,6 @@ public function assignReviewer(
+         AssignDocumentReviewerRequest $request,
+         Document $document,
+     ): RedirectResponse {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('assignReviewer', $document);
+         $document->loadMissing('assignee');
+ 
+@@ -372,7 +366,6 @@ public function bulkAssignReviewer(BulkAssignDocumentReviewerRequest $request):
+ 
+     public function update(UpdateDocumentRequest $request, Document $document): RedirectResponse
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('update', $document);
+ 
+         $originalTitle = $document->title;
+@@ -391,7 +384,6 @@ public function update(UpdateDocumentRequest $request, Document $document): Redi
+ 
+     public function destroy(Request $request, Document $document): RedirectResponse
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('delete', $document);
+ 
+         /** @var User $user */
+@@ -404,7 +396,6 @@ public function destroy(Request $request, Document $document): RedirectResponse
+ 
+     public function download(Request $request, Document $document): RedirectResponse
+     {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize('view', $document);
+ 
+         $this->logDocumentAction($document, $request, 'downloaded');
+@@ -428,20 +419,6 @@ protected function logDocumentAction(Document $document, Request $request, strin
+         ]);
+     }
+ 
+-    protected function ensureCurrentTenantMatter(Matter $matter): Matter
+-    {
+-        abort_unless($matter->tenant_id === tenant()?->id, 404);
+-
+-        return $matter;
+-    }
+-
+-    protected function ensureCurrentTenantDocument(Document $document): Document
+-    {
+-        abort_unless($document->tenant_id === tenant()?->id, 404);
+-
+-        return $document;
+-    }
+-
+     protected function isRealtimeRefresh(Request $request): bool
+     {
+         return $request->header('X-Inertia-Partial-Data') !== null;
+@@ -572,7 +549,6 @@ protected function transitionForManualReview(
+         DocumentStatus $toStatus,
+         string $ability,
+     ): RedirectResponse {
+-        $document = $this->ensureCurrentTenantDocument($document);
+         $this->authorize($ability, $document);
+ 
+         try {
+diff --git a/bootstrap/app.php b/bootstrap/app.php
+index f376d71..0a7c701 100644
+--- a/bootstrap/app.php
++++ b/bootstrap/app.php
+@@ -29,6 +29,11 @@
+         $middleware->alias([
+             'tenant' => InitializeTenantContext::class,
+         ]);
++
++        $middleware->prependToPriorityList(
++            before: \Illuminate\Routing\Middleware\SubstituteBindings::class,
++            prepend: \App\Http\Middleware\InitializeTenantContext::class,
++        );
+     })
+     ->withExceptions(function (Exceptions $exceptions): void {
+         //
+diff --git a/phpunit.xml b/phpunit.xml
+index 2802954..dfd25ca 100644
+--- a/phpunit.xml
++++ b/phpunit.xml
+@@ -11,6 +11,9 @@
+         <testsuite name="Feature">
+             <directory>tests/Feature</directory>
+         </testsuite>
++        <testsuite name="Architecture">
++            <directory>tests/Architecture</directory>
++        </testsuite>
+     </testsuites>
+     <source>
+         <include>
+diff --git a/tests/Architecture/ArchitecturalRulesTest.php b/tests/Architecture/ArchitecturalRulesTest.php
+index 057fc98..7d7bec6 100644
+--- a/tests/Architecture/ArchitecturalRulesTest.php
++++ b/tests/Architecture/ArchitecturalRulesTest.php
+@@ -41,3 +41,27 @@
+         'App\Http\Controllers\Admin\QueueHealthController',
+         'App\Broadcasting\BroadcastChannelAuthorizer',
+     ]);
++
++test('controllers do not reintroduce ad-hoc tenant scoping helpers', function (): void {
++    $controllersPath = dirname(__DIR__, 2).'/app/Http/Controllers';
++
++    $controllerFiles = (new Symfony\Component\Finder\Finder)
++        ->in($controllersPath)
++        ->files()
++        ->name('*.php');
++
++    $offenders = [];
++
++    foreach ($controllerFiles as $controllerFile) {
++        if (preg_match('/ensureCurrentTenant\w*/', $controllerFile->getContents()) === 1) {
++            $offenders[] = $controllerFile->getRelativePathname();
++        }
++    }
++
++    expect($offenders)->toBeEmpty(
++        sprintf(
++            'Controllers must rely on the BelongsToTenant global scope; ad-hoc ensureCurrentTenant* helpers found in: %s',
++            implode(', ', $offenders),
++        ),
++    );
++});
+diff --git a/tests/Unit/Models/TenantScopeTest.php b/tests/Unit/Models/TenantScopeTest.php
+new file mode 100644
+index 0000000..21789ff
+--- /dev/null
++++ b/tests/Unit/Models/TenantScopeTest.php
+@@ -0,0 +1,52 @@
++<?php
++
++declare(strict_types=1);
++
++use App\Models\Client;
++use App\Models\Document;
++use App\Models\Matter;
++use App\Models\Tenant;
++use Illuminate\Foundation\Testing\RefreshDatabase;
++use Stancl\Tenancy\Database\TenantScope;
++
++pest()->extend(Tests\TestCase::class)->use(RefreshDatabase::class);
++
++afterEach(function (): void {
++    tenancy()->end();
++});
++
++function makeTenantScopedDocument(): Document
++{
++    $tenant = Tenant::factory()->create();
++    $client = Client::factory()->create(['tenant_id' => $tenant->id]);
++    $matter = Matter::factory()->create(['tenant_id' => $tenant->id, 'client_id' => $client->id]);
++
++    return Document::factory()->create(['tenant_id' => $tenant->id, 'matter_id' => $matter->id]);
++}
++
++test('Document::find returns null for foreign-tenant id', function (): void {
++    $foreignDocument = makeTenantScopedDocument();
++    $currentTenant = Tenant::factory()->create();
++
++    tenancy()->initialize($currentTenant);
++
++    expect(Document::find($foreignDocument->id))->toBeNull();
++});
++
++test('Document::find returns the model for matching tenant', function (): void {
++    $document = makeTenantScopedDocument();
++    $tenant = Tenant::query()->findOrFail($document->tenant_id);
++
++    tenancy()->initialize($tenant);
++
++    expect(Document::find($document->id))->not->toBeNull();
++});
++
++test('Document::withoutGlobalScope(TenantScope::class)->find bypasses scope', function (): void {
++    $foreignDocument = makeTenantScopedDocument();
++    $currentTenant = Tenant::factory()->create();
++
++    tenancy()->initialize($currentTenant);
++
++    expect(Document::withoutGlobalScope(TenantScope::class)->find($foreignDocument->id))->not->toBeNull();
++});
