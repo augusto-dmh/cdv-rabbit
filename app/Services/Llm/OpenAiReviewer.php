@@ -36,26 +36,19 @@ final class OpenAiReviewer implements LlmDriverInterface
         $startMs = (int) (microtime(true) * 1000);
 
         try {
-            $streamedResponse = null;
-
-            $streamable = (new OpenAiReviewAgent)
+            // laravel/ai rejects `stream()` + HasStructuredOutput on the OpenAI
+            // Responses API ("Streaming structured output is not currently supported"),
+            // so we use the non-streaming `prompt()` and aggregate the AgentResponse.
+            $response = (new OpenAiReviewAgent)
                 ->withInstructions($systemPrompt)
                 ->withSchema($toolSchema)
-                ->stream($userMessage)
-                ->then(function ($r) use (&$streamedResponse): void {
-                    $streamedResponse = $r;
-                });
-
-            foreach ($streamable as $event) {
-                // Drain events; we only need the final aggregated response.
-            }
+                ->prompt($userMessage);
 
             $endMs = (int) (microtime(true) * 1000);
 
-            $usage = $streamedResponse->usage;
             $headerBag = $this->container->make(OpenAiHeaderBag::class);
 
-            return $this->buildResult($streamedResponse, $usage, $headerBag, $endMs - $startMs);
+            return $this->buildResult($response, $response->usage, $headerBag, $endMs - $startMs);
         } catch (Throwable $e) {
             $decision = $this->classifier->classify($e);
 
