@@ -36,6 +36,10 @@ _Avoid_: comment, issue, remark, observation.
 A cosmetic or stylistic suggestion that does not block merge — collapsed into a single rolled-up section of the summary comment, never posted inline. Distinct from a low-severity **Finding**: a Nitpick has no correctness or maintainability impact; a low Finding has small but real impact.
 _Avoid_: nit (in code/schemas, write `nitpick`), style comment, formatting note.
 
+**Agent Prompt**:
+A natural-language imperative attached to a **Finding**, rendered as a collapsed `<details>` block at the bottom of the inline comment, intended to be copy-pasted into a third-party coding agent (Claude Code, Cursor, etc.) so the agent can apply the fix without re-reading the PR. Distinct from `message` (diagnostic for a human reader) and `suggestion` (diff snippet, human-readable). Always opens with a fixed preamble: "Verify each finding against the current code and only fix it if needed." Schema field: `findings[].agent_prompt` (string, nullable, max 1500 chars).
+_Avoid_: ai prompt, fix prompt, codegen prompt, copyable prompt, ai agent prompt.
+
 ## Relationships
 
 - A **Workspace** has exactly one **SCM Provider** at a time.

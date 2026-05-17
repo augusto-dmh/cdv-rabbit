@@ -36,14 +36,15 @@
         "items": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["path", "line", "severity", "category", "message", "suggestion"],
+          "required": ["path", "line", "severity", "category", "message", "suggestion", "agent_prompt"],
           "properties": {
             "path": { "type": "string" },
             "line": { "type": "integer", "minimum": 1 },
             "severity": { "enum": ["high", "medium", "low"] },
             "category": { "enum": ["bug", "security", "perf", "maintainability"] },
             "message": { "type": "string", "maxLength": 1500 },
-            "suggestion": { "type": ["string", "null"], "maxLength": 1500 }
+            "suggestion": { "type": ["string", "null"], "maxLength": 1500 },
+            "agent_prompt": { "type": ["string", "null"], "maxLength": 1500 }
           }
         }
       },

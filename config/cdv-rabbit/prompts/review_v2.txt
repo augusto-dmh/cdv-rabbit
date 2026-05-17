@@ -137,6 +137,23 @@ When the diff touches database queries, caching, loops over collections, I/O cal
 
 Only report checklist items actually present in the diff.
 
+## Agent Prompt rules
+
+Every Finding carries an `agent_prompt` field — a natural-language imperative that a third-party coding agent (Claude Code, Cursor, etc.) can act on without re-reading the PR. The PR comment renders it as a collapsed `<details>🤖 Prompt for AI Agents</summary>` block at the footer of the inline comment.
+
+Body contract (the preamble "Verify each finding against the current code and only fix it if needed." is added by post-processing — do NOT emit it):
+
+1. Open with the anchor: `` In `@<path>` around lines <line-2> - <line+2>, `` where `<path>` matches `findings[].path` and the line span brackets `findings[].line` by ±2. Use the `@<path>` form — this is NOT a user mention; it is the agent-readable file-reference convention recognized by Claude Code, Cursor, and similar agents.
+2. Restate the defect in one prose sentence — what is wrong and why it matters.
+3. Issue an imperative fix instruction with concrete symbols (function name, variable name, file path). Cross-file references are allowed and encouraged when the fix touches more than the anchored file.
+4. Plain prose only. No markdown tables. No image markdown. No code fences inside the prompt body (the renderer wraps the whole prompt in a fence). Max 1500 characters.
+
+Emit `agent_prompt: null` (NOT an empty string) when:
+- The Finding is trivially fixable from `message` alone (e.g. "missing trailing comma" — the fix is self-describing and a prompt would be cerimony).
+- The Finding describes a multi-defect class better resolved by a human reading the surrounding code.
+
+Never emit `agent_prompt` content for `nitpicks[]` entries — they are formatter-territory and never reach an agent handoff.
+
 ## Examples
 
 The examples below show the EXACT shape of `findings[]` entries you must emit when you encounter these patterns. Diff snippets are illustrative; real diffs will differ in surrounding context but the Finding shape is the contract.
@@ -155,7 +172,8 @@ Expected findings[] entry:
   "severity": "medium",
   "category": "perf",
   "message": "N+1 query: each iteration calls Document::find() and lazy-loads the reviewers relation, issuing 2*N queries for N document_ids. At scale this saturates the database connection pool and dominates request latency.",
-  "suggestion": "Replace with a single batched query: Document::with('reviewers')->whereIn('id', $request->document_ids)->get(), then map over the collection. This reduces the path to 2 queries regardless of N."
+  "suggestion": "Replace with a single batched query: Document::with('reviewers')->whereIn('id', $request->document_ids)->get(), then map over the collection. This reduces the path to 2 queries regardless of N.",
+  "agent_prompt": "In `@app/Http/Controllers/DocumentController.php` around lines 1 - 5, the loop over `$request->document_ids` calls `Document::find($id)` per iteration and then accesses `$document->reviewers->pluck('name')`, producing 2*N queries for N ids; replace the loop with a single eager-loaded query `Document::with('reviewers')->whereIn('id', $request->document_ids)->get()` and map over the resulting collection to build `$names`, so the reviewers relation is pre-loaded and no per-item query fires."
 }
 </example>
 
@@ -175,7 +193,8 @@ Expected findings[] entry:
   "severity": "high",
   "category": "security",
   "message": "Cross-tenant data exposure: Document::query() bypasses any BelongsToWorkspace global scope inferred from the model definition. Without an explicit workspace_id filter, authenticated users in workspace A can paginate documents from workspace B.",
-  "suggestion": "Apply the workspace scope explicitly: Document::where('workspace_id', $request->user()->workspace_id)->where('status', $request->status)->paginate(). Or assert the global scope is registered on the model and use Document::query() through the trait's scoped resolver."
+  "suggestion": "Apply the workspace scope explicitly: Document::where('workspace_id', $request->user()->workspace_id)->where('status', $request->status)->paginate(). Or assert the global scope is registered on the model and use Document::query() through the trait's scoped resolver.",
+  "agent_prompt": "In `@app/Http/Controllers/Api/DocumentApiController.php` around lines 2 - 6, the `index()` action runs `Document::query()->where('status', $request->status)->paginate()` without a workspace filter, which lets authenticated users in workspace A paginate documents from workspace B; either add an explicit `->where('workspace_id', $request->user()->workspace_id)` before `->where('status', ...)` or confirm the `BelongsToWorkspace` global scope is registered on the `Document` model and call it through the trait's scoped resolver instead of the bare `Document::query()`."
 }
 </example>
 
@@ -195,7 +214,8 @@ Expected findings[] entry:
   "severity": "medium",
   "category": "security",
   "message": "Information disclosure: abort(403) confirms the resource exists in another workspace. An attacker probing IDs can distinguish 'resource exists but forbidden' (403) from 'resource does not exist' (404) and enumerate cross-tenant resources by ID range.",
-  "suggestion": "Return abort(404) for tenant mismatches so the response is indistinguishable from a genuinely missing resource. Reserve 403 for in-tenant authorization failures where the resource's existence is already implied by the request path."
+  "suggestion": "Return abort(404) for tenant mismatches so the response is indistinguishable from a genuinely missing resource. Reserve 403 for in-tenant authorization failures where the resource's existence is already implied by the request path.",
+  "agent_prompt": "In `@app/Concerns/EnsuresSameTenant.php` around lines 2 - 6, the `ensureSameTenant()` method returns `abort(403)` when `$resource->workspace_id !== auth()->user()->workspace_id`, which leaks cross-tenant existence (an attacker probing IDs distinguishes a forbidden resource from a missing one); change the `abort(403)` to `abort(404)` so the response is indistinguishable from a genuinely missing resource, and keep `abort(403)` reserved for in-tenant authorization failures elsewhere in the trait."
 }
 </example>
 
@@ -215,7 +235,8 @@ Expected findings[] entry:
   "severity": "high",
   "category": "security",
   "message": "Secret exposure: the OAuth access token is written to application logs in plaintext. Anyone with log-read access — operators, log-shipping pipelines, archived backups — gains the ability to impersonate the installer against the GitHub API for the token's lifetime.",
-  "suggestion": "Remove the token from the log line entirely, or redact to a fingerprint: Log::info('GitHub OAuth token issued', ['fingerprint' => substr(hash('sha256', $token), 0, 8)]). Confirm no other log statements in the OAuth flow include the raw token."
+  "suggestion": "Remove the token from the log line entirely, or redact to a fingerprint: Log::info('GitHub OAuth token issued', ['fingerprint' => substr(hash('sha256', $token), 0, 8)]). Confirm no other log statements in the OAuth flow include the raw token.",
+  "agent_prompt": "In `@app/Services/Scm/Github/GithubInstaller.php` around lines 2 - 6, the `exchangeCode()` method writes the OAuth access token returned by `$this->github->oauthExchange($code)` directly into `Log::info('GitHub OAuth token issued: '.$token)`, persisting the secret in plaintext across log shippers and backups; replace that log call with a redacted form such as `Log::info('GitHub OAuth token issued', ['fingerprint' => substr(hash('sha256', $token), 0, 8)])` so the token never reaches the log substrate, and grep `app/Services/Scm/Github/` for any other `Log::*` calls that include the raw token to redact them in the same fashion."
 }
 </example>
 
@@ -238,7 +259,8 @@ Expected findings[] entry:
   "severity": "high",
   "category": "security",
   "message": "Timing attack: === short-circuits on the first byte mismatch, leaking signature bytes through response-time differentials. An attacker can iterate byte-by-byte to forge a valid signature given enough request samples.",
-  "suggestion": "Use a constant-time comparator: if (hash_equals($expected, (string) $received)) { return $next($request); }. hash_equals walks the full length regardless of mismatch position and is the documented PHP primitive for this exact case."
+  "suggestion": "Use a constant-time comparator: if (hash_equals($expected, (string) $received)) { return $next($request); }. hash_equals walks the full length regardless of mismatch position and is the documented PHP primitive for this exact case.",
+  "agent_prompt": "In `@app/Http/Middleware/VerifyGithubWebhook.php` around lines 3 - 7, the `handle()` method compares the computed HMAC signature against the request header using `$received === $expected`, which short-circuits on the first byte mismatch and leaks signature bytes through response-time differentials; replace that strict equality with PHP's constant-time comparator — `if (hash_equals($expected, (string) $received)) { return $next($request); }` — so the comparison walks the full length regardless of where the mismatch falls, and verify no other `===` signature checks remain in the same middleware or sibling webhook verifiers."
 }
 </example>
 
@@ -284,7 +306,7 @@ Nitpicks belong in the `nitpicks` array, not as Findings. Reject any candidate F
 
 ## Forbidden content in Findings and Nitpicks
 
-- No `@mentions` of any user, team, or bot.
+- No `@mentions` of any user, team, or bot in `message`, `suggestion`, or `nitpick.message`. The `@<path>` references inside `agent_prompt` are NOT user mentions and are explicitly allowed there (and only there).
 - No SCM issue references (`#123`, `BB-456`, `GH-789`).
 - No embedded images or image markdown (`![...](...)`).
 - No raw HTML tags (`<b>`, `<script>`, etc.).

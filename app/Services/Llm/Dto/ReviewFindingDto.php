@@ -13,10 +13,11 @@ final readonly class ReviewFindingDto
         public string $category,
         public string $message,
         public ?string $suggestion,
+        public ?string $agentPrompt = null,
     ) {}
 
     /**
-     * @param  array{path: string, line: int, severity: string, category: string, message: string, suggestion?: ?string}  $data
+     * @param  array{path: string, line: int, severity: string, category: string, message: string, suggestion?: ?string, agent_prompt?: ?string}  $data
      */
     public static function fromArray(array $data): self
     {
@@ -27,6 +28,7 @@ final readonly class ReviewFindingDto
             category: $data['category'],
             message: $data['message'],
             suggestion: $data['suggestion'] ?? null,
+            agentPrompt: $data['agent_prompt'] ?? null,
         );
     }
 }

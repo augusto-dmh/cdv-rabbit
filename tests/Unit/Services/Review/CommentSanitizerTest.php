@@ -66,3 +66,36 @@ it('leaves clean comment unchanged', function () {
 
     expect($result)->toBe($message);
 });
+
+// AC53: @path-like references (slash-bearing) are preserved for Agent Prompt
+// CodeRabbit-parity; @username refs (no slash) are still stripped.
+
+it('preserves @path-like references containing a slash', function () {
+    $result = $this->sanitizer->sanitize('In `@src/app/Foo.php` around lines 10 - 14, update the call.');
+
+    expect($result)
+        ->toContain('@src/app/Foo.php')
+        ->toContain('lines 10 - 14');
+});
+
+it('preserves @path with nested directory segments', function () {
+    $result = $this->sanitizer->sanitize('See `@app/Services/Review/CommentPoster.php` for the rendering site.');
+
+    expect($result)->toContain('@app/Services/Review/CommentPoster.php');
+});
+
+it('still strips @username when there is no slash', function () {
+    $result = $this->sanitizer->sanitize('@alice and @cdv-team should review this.');
+
+    expect($result)
+        ->not->toContain('@alice')
+        ->not->toContain('@cdv-team');
+});
+
+it('distinguishes @path from @username when both appear in the same message', function () {
+    $result = $this->sanitizer->sanitize('@alice please look at `@src/app/Foo.php`.');
+
+    expect($result)
+        ->not->toContain('@alice')
+        ->toContain('@src/app/Foo.php');
+});

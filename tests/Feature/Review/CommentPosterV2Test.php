@@ -268,3 +268,240 @@ it('AC48: every comment body carries the AI-label prefix', function (): void {
         expect($body)->toContain($aiMarker);
     }
 });
+
+// ---------------------------------------------------------------------------
+// AC52, AC55, AC56: Agent Prompt rendering (ADR 0006)
+// ---------------------------------------------------------------------------
+
+it('AC52: inline comment renders <details>🤖 Prompt for AI Agents</summary> block when agent_prompt is non-null', function (): void {
+    $workspace = Workspace::factory()->create();
+    $review = makeReviewForWorkspace($workspace);
+    $scmDriver = makeFakeScmDriverForPoster();
+
+    $finding = new ReviewFindingDto(
+        path: 'app/Services/Foo.php',
+        line: 42,
+        severity: 'high',
+        category: 'bug',
+        message: 'Null pointer on line 42.',
+        suggestion: null,
+        agentPrompt: 'In `@app/Services/Foo.php` around lines 40 - 44, add a null check before dereference.',
+    );
+
+    $draft = buildDraft([$finding], []);
+
+    app(CommentPoster::class)->postV2($review, $draft, 'repo-123', $scmDriver);
+
+    expect($scmDriver->inlineComments)->toHaveCount(1);
+    $body = $scmDriver->inlineComments[0]['body'];
+
+    expect($body)
+        ->toContain('<details>')
+        ->toContain('<summary>🤖 Prompt for AI Agents</summary>')
+        ->toContain('Verify each finding against the current code and only fix it if needed.')
+        ->toContain('@app/Services/Foo.php')
+        ->toContain('around lines 40 - 44')
+        ->toContain('</details>');
+});
+
+it('AC56: inline comment renders NO <details>🤖 block when agent_prompt is null', function (): void {
+    $workspace = Workspace::factory()->create();
+    $review = makeReviewForWorkspace($workspace);
+    $scmDriver = makeFakeScmDriverForPoster();
+
+    $finding = new ReviewFindingDto(
+        path: 'app/Services/Bar.php',
+        line: 7,
+        severity: 'low',
+        category: 'maintainability',
+        message: 'Trivial naming issue.',
+        suggestion: 'Rename to $userCount.',
+        agentPrompt: null,
+    );
+
+    $draft = buildDraft([$finding], []);
+
+    app(CommentPoster::class)->postV2($review, $draft, 'repo-123', $scmDriver);
+
+    expect($scmDriver->inlineComments)->toHaveCount(1);
+    $body = $scmDriver->inlineComments[0]['body'];
+
+    expect($body)
+        ->not->toContain('Prompt for AI Agents')
+        ->not->toContain('Verify each finding')
+        ->toContain('Trivial naming issue.')
+        ->toContain('**Suggested fix:**');
+});
+
+it('AC56: inline comment renders NO <details>🤖 block when agent_prompt is whitespace-only', function (): void {
+    $workspace = Workspace::factory()->create();
+    $review = makeReviewForWorkspace($workspace);
+    $scmDriver = makeFakeScmDriverForPoster();
+
+    $finding = new ReviewFindingDto(
+        path: 'app/Services/Baz.php',
+        line: 9,
+        severity: 'low',
+        category: 'bug',
+        message: 'Edge case.',
+        suggestion: null,
+        agentPrompt: "  \n  \n  ",
+    );
+
+    $draft = buildDraft([$finding], []);
+
+    app(CommentPoster::class)->postV2($review, $draft, 'repo-123', $scmDriver);
+
+    expect($scmDriver->inlineComments[0]['body'])
+        ->not->toContain('Prompt for AI Agents');
+});
+
+it('AC55: unresolved Findings (SCM 422 fallback) carry agent_prompt as nested <details> inside the summary', function (): void {
+    $workspace = Workspace::factory()->create();
+    $review = makeReviewForWorkspace($workspace);
+
+    // Fake driver that throws on inline post — forces every Finding into the
+    // unresolved bucket and out into postV2Summary.
+    $scmDriver = new class extends stdClass implements ScmDriverInterface
+    {
+        public array $summaryComments = [];
+
+        private int $seq = 3000;
+
+        public function postInlineComment(string $scmRepoId, int $prNumber, InlineCommentPayload $payload): CommentHandle
+        {
+            throw new RuntimeException('422 path could not be resolved');
+        }
+
+        public function postPullRequestComment(string $scmRepoId, int $prNumber, string $body): CommentHandle
+        {
+            $this->summaryComments[] = $body;
+
+            return new CommentHandle(scmCommentId: (string) $this->seq++);
+        }
+
+        public function updateComment(string $scmRepoId, int $prNumber, CommentHandle $handle, string $body): CommentHandle
+        {
+            return $handle;
+        }
+
+        public function getPullRequest(string $scmRepoId, int $prNumber): ?PullRequestDto
+        {
+            return null;
+        }
+
+        public function getChangedFiles(string $scmRepoId, int $prNumber): Collection
+        {
+            return collect();
+        }
+
+        public function getDiff(string $scmRepoId, int $prNumber): ?string
+        {
+            return null;
+        }
+
+        public function verifyCredentials(): CredentialCheck
+        {
+            return new CredentialCheck(valid: true, message: 'ok');
+        }
+
+        public function listRepositories(): Collection
+        {
+            return collect();
+        }
+
+        public function getRepository(string $scmRepoId): ?RepositoryDto
+        {
+            return null;
+        }
+
+        public function registerWebhook(string $scmRepoId, string $callbackUrl, string $secret): ?WebhookHandle
+        {
+            return null;
+        }
+
+        public function deleteWebhook(string $scmRepoId, ?WebhookHandle $handle): void {}
+
+        public function postCommitStatus(string $scmRepoId, string $headSha, string $state, string $context, string $description, ?string $targetUrl = null): void {}
+    };
+
+    $finding = new ReviewFindingDto(
+        path: 'app/Services/Foo.php',
+        line: 42,
+        severity: 'high',
+        category: 'bug',
+        message: 'Null pointer.',
+        suggestion: null,
+        agentPrompt: 'In `@app/Services/Foo.php` around lines 40 - 44, add a null check.',
+    );
+
+    $draft = buildDraft([$finding], []);
+
+    app(CommentPoster::class)->postV2($review, $draft, 'repo-123', $scmDriver);
+
+    expect($scmDriver->summaryComments)->toHaveCount(1);
+    $body = $scmDriver->summaryComments[0];
+
+    expect($body)
+        ->toContain('Unresolved Findings (1)')
+        ->toContain('Prompt for AI Agents')
+        ->toContain('@app/Services/Foo.php')
+        ->toContain('add a null check');
+});
+
+// ---------------------------------------------------------------------------
+// AC54: agent_prompt survives the critic strip+rehydrate by construction
+// ---------------------------------------------------------------------------
+
+it('AC54: DraftReviewDto::toCriticInputArray() does NOT leak agent_prompt to the critic', function (): void {
+    $finding = new ReviewFindingDto(
+        path: 'app/Services/Foo.php',
+        line: 42,
+        severity: 'high',
+        category: 'bug',
+        message: 'Null pointer.',
+        suggestion: null,
+        agentPrompt: 'In `@app/Services/Foo.php` around lines 40 - 44, add a null check.',
+    );
+
+    $draft = buildDraft([$finding], []);
+    $criticInput = $draft->toCriticInputArray();
+
+    expect($criticInput['findings'])->toHaveCount(1);
+    expect($criticInput['findings'][0])
+        ->toHaveKey('path')
+        ->toHaveKey('line')
+        ->toHaveKey('severity')
+        ->toHaveKey('category')
+        ->toHaveKey('message')
+        ->toHaveKey('suggestion')
+        ->not->toHaveKey('agent_prompt');
+});
+
+it('AC54: withFindingsAtIndices() preserves the original agent_prompt on approved Findings', function (): void {
+    $findingA = new ReviewFindingDto(
+        path: 'app/A.php',
+        line: 1,
+        severity: 'high',
+        category: 'bug',
+        message: 'A bug.',
+        suggestion: null,
+        agentPrompt: 'In `@app/A.php` around lines 1 - 3, fix the bug.',
+    );
+    $findingB = new ReviewFindingDto(
+        path: 'app/B.php',
+        line: 2,
+        severity: 'low',
+        category: 'maintainability',
+        message: 'B issue.',
+        suggestion: null,
+        agentPrompt: null,
+    );
+
+    $draft = buildDraft([$findingA, $findingB], []);
+    $filtered = $draft->withFindingsAtIndices([0]);
+
+    expect($filtered->findings)->toHaveCount(1);
+    expect($filtered->findings[0]->agentPrompt)
+        ->toBe('In `@app/A.php` around lines 1 - 3, fix the bug.');
+});

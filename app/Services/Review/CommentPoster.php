@@ -125,6 +125,7 @@ final class CommentPoster
             category: $finding->category,
             message: $finding->message,
             suggestion: $finding->suggestion,
+            agentPrompt: $finding->agentPrompt,
         );
     }
 
@@ -230,6 +231,14 @@ final class CommentPoster
         }
 
         $rawMessage = self::AI_MARKER.' '.$this->sanitizer->sanitize($body);
+
+        // Agent Prompt footer (ADR 0006): rendered outside sanitize() so the
+        // `<details>`/`<summary>` structural tags survive strip_tags(); the
+        // prompt body itself is sanitized inside renderAgentPromptBlock().
+        $agentPromptBlock = $this->renderAgentPromptBlock($finding->agentPrompt);
+        if ($agentPromptBlock !== '') {
+            $rawMessage .= "\n\n".$agentPromptBlock;
+        }
 
         $existing = ReviewComment::where('review_id', $review->id)
             ->where('file_path', $finding->path)
@@ -341,6 +350,14 @@ final class CommentPoster
                 $cat = strtoupper($finding->category);
                 $msg = $this->sanitizer->sanitize($finding->message);
                 $text .= "- `{$finding->path}:{$finding->line}` — [{$sev}] [{$cat}] {$msg}\n";
+
+                // AC55: nest the Agent Prompt block inside the unresolved bullet
+                // when present — exactly where the developer most needs it,
+                // since the issue cannot be seen inline.
+                $agentPromptBlock = $this->renderAgentPromptBlock($finding->agentPrompt);
+                if ($agentPromptBlock !== '') {
+                    $text .= "\n".$agentPromptBlock."\n";
+                }
             }
             $text .= "\n</details>\n\n";
         }
@@ -392,5 +409,30 @@ final class CommentPoster
         $message = $this->sanitizer->sanitize($nitpick->message);
 
         return "`{$nitpick->path}:{$nitpick->line}` — {$message}";
+    }
+
+    /**
+     * Render the CodeRabbit-parity `🤖 Prompt for AI Agents` footer block.
+     *
+     * Returns an empty string when the prompt body is null or whitespace —
+     * caller skips appending so the comment renders clean (AC56).
+     * The fixed preamble is concatenated here (never LLM-emitted, ADR 0006);
+     * the prompt body is sanitized via the path-aware CommentSanitizer (AC53)
+     * so `@<path>` references survive while `@<username>` mentions die.
+     */
+    private function renderAgentPromptBlock(?string $promptBody): string
+    {
+        if ($promptBody === null) {
+            return '';
+        }
+
+        $sanitized = $this->sanitizer->sanitize($promptBody);
+        if ($sanitized === '') {
+            return '';
+        }
+
+        $preamble = 'Verify each finding against the current code and only fix it if needed.';
+
+        return "<details>\n<summary>🤖 Prompt for AI Agents</summary>\n\n```\n{$preamble}\n\n{$sanitized}\n```\n\n</details>";
     }
 }
