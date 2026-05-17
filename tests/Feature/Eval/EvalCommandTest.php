@@ -115,9 +115,23 @@ it('fails when recall is below threshold', function (): void {
     ])->assertExitCode(1);
 });
 
-it('exits 2 when --schema=v2 is requested (not yet implemented in W7-T1)', function (): void {
+it('accepts --schema=v2 (ADR 0007 §1 wired the v2 path)', function (): void {
+    $emptyDir = sys_get_temp_dir().'/golden-empty-'.uniqid();
+    mkdir($emptyDir);
+
+    try {
+        $this->artisan('rabbit:eval', [
+            '--schema' => 'v2',
+            '--corpus' => $emptyDir,
+        ])->assertExitCode(0);
+    } finally {
+        @rmdir($emptyDir);
+    }
+});
+
+it('exits 2 when --schema is unknown', function (): void {
     $this->artisan('rabbit:eval', [
-        '--schema' => 'v2',
+        '--schema' => 'v9',
     ])->assertExitCode(2);
 });
 

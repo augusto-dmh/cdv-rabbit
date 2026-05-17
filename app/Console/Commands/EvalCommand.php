@@ -8,31 +8,42 @@ use App\Services\Eval\EvalResult;
 use App\Services\Eval\GoldenFixture;
 use App\Services\Eval\LlmJudge;
 use App\Services\Llm\ClaudeReviewer;
+use App\Services\Llm\Dto\DraftReviewDto;
+use App\Services\Llm\Dto\ReviewFindingDto;
 use App\Services\Llm\Dto\ReviewResultDto;
 use App\Services\Llm\LlmDriverInterface;
 use App\Services\Llm\OpenAiReviewer;
+use App\Services\Llm\PromptBuilder;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Container\Container;
 use Throwable;
 
 /**
- * `rabbit:eval` — golden-PR quality eval harness (Phase 7, W7-T1).
+ * `rabbit:eval` — golden-PR quality eval harness (Phase 7, W7-T1; v2 wired in ADR 0007 §1).
  *
- * For every loaded golden fixture, runs the configured provider's v1 review
+ * For every loaded golden fixture, runs the configured provider's review
  * pipeline against the fixture diff, feeds the resulting Findings into
- * LlmJudge (which routes to the opposite provider — AC41), then emits a
- * per-cell table and a structured JSON log row to storage/logs/eval/.
+ * LlmJudge (cross-provider by default — AC41), then emits a per-cell table
+ * and a structured JSON log row to storage/logs/eval/.
+ *
+ * Schema branches:
+ * - v1: single call to `reviewDiff()`; the resulting comments are flattened
+ *   into Findings.
+ * - v2: `reviewDiffV2()` produces a DraftReviewDto; `critiqueDraft()` then
+ *   verdicts each Finding. Only approved Findings reach the judge — the
+ *   same filter the production CommentPoster applies, so the eval recall
+ *   reflects what would land on a PR.
  *
  * Exit codes:
  * - 0: every cell met both thresholds (or no fixtures were present).
  * - 1: at least one cell fell below --threshold-recall or --threshold-precision.
- * - 2: --schema=v2 was requested (schema v2 is W7-T2; not yet implemented).
+ * - 2: --schema=[unknown] was requested.
  */
 final class EvalCommand extends Command
 {
     protected $signature = 'rabbit:eval
         {--provider=* : One or more LLM providers to evaluate (anthropic, openai). Defaults to all known providers.}
-        {--schema=v1 : Review result schema version to evaluate (v1 only until W7-T2 lands).}
+        {--schema=v1 : Review result schema version to evaluate (v1 or v2).}
         {--threshold-recall=0.7 : Minimum recall per cell.}
         {--threshold-precision=0.5 : Minimum precision per cell.}
         {--corpus= : Override the golden corpus root directory.}
@@ -43,6 +54,7 @@ final class EvalCommand extends Command
     public function __construct(
         private readonly Container $container,
         private readonly LlmJudge $judge,
+        private readonly PromptBuilder $promptBuilder,
     ) {
         parent::__construct();
     }
@@ -51,16 +63,14 @@ final class EvalCommand extends Command
     {
         $schema = (string) $this->option('schema');
 
-        if ($schema === 'v2') {
-            $this->error('rabbit:eval: schema v2 not yet implemented (W7-T2 scope). Run with --schema=v1.');
+        if (! in_array($schema, ['v1', 'v2'], true)) {
+            $this->error("rabbit:eval: unknown --schema=[{$schema}]. Supported: v1, v2.");
 
             return 2;
         }
 
-        if ($schema !== 'v1') {
-            $this->error("rabbit:eval: unknown --schema=[{$schema}]. Supported: v1.");
-
-            return 2;
+        if (! (bool) config('cdv-rabbit.eval.cross_provider_judge', true)) {
+            $this->warn('rabbit:eval: cross_provider_judge=false — judge uses same provider as reviewer; AC41 bias control disabled.');
         }
 
         $providers = $this->resolveProviders();
@@ -150,13 +160,11 @@ final class EvalCommand extends Command
     {
         try {
             $driver = $this->resolveDriver($provider);
-            $review = $driver->reviewDiff(
-                systemPrompt: $driver->getSystemPrompt(),
-                toolSchema: $driver->getToolSchema(),
-                userMessage: $this->buildUserMessage($fixture),
-            );
 
-            $actualFindings = $this->extractFindings($review);
+            $actualFindings = $schema === 'v2'
+                ? $this->runV2($driver, $fixture)
+                : $this->runV1($driver, $fixture);
+
             $verdict = $this->judge->judge($actualFindings, $fixture->expectedFindings, $provider);
 
             return new EvalResult(
@@ -184,6 +192,82 @@ final class EvalCommand extends Command
                 error: $e->getMessage(),
             );
         }
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function runV1(LlmDriverInterface $driver, GoldenFixture $fixture): array
+    {
+        $review = $driver->reviewDiff(
+            systemPrompt: $driver->getSystemPrompt(),
+            toolSchema: $driver->getToolSchema(),
+            userMessage: $this->buildUserMessage($fixture),
+        );
+
+        return $this->extractFindings($review);
+    }
+
+    /**
+     * Run the v2 draft → critique pipeline against the fixture diff and return
+     * only the critic-approved Findings — the same filter `CommentPoster::postV2`
+     * applies in production. Wraps the diff via PromptBuilder so the LLM sees
+     * the `+[L<N>]` line annotations and `<pr_metadata>` envelope that production
+     * uses.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function runV2(LlmDriverInterface $driver, GoldenFixture $fixture): array
+    {
+        $reviewUserMessage = $this->promptBuilder->wrap(
+            $fixture->diff,
+            [
+                'title' => (string) ($fixture->prMetadata['title'] ?? $fixture->fixtureId),
+                'branch' => (string) ($fixture->prMetadata['branch'] ?? ''),
+                'author' => (string) ($fixture->prMetadata['author'] ?? ''),
+            ],
+            annotateLines: true,
+        );
+
+        $draft = $driver->reviewDiffV2(
+            systemPrompt: $driver->getReviewSystemPromptForVersion('v2'),
+            toolSchema: $driver->getReviewToolSchemaForVersion('v2'),
+            userMessage: $reviewUserMessage,
+        );
+
+        $criticUserMessage = "<diff>\n".$this->xmlEscape($fixture->diff)."\n</diff>\n<draft>\n"
+            .json_encode($draft->toCriticInputArray(), JSON_PRETTY_PRINT)."\n</draft>";
+
+        $critique = $driver->critiqueDraft(
+            systemPrompt: $driver->getCriticSystemPrompt(),
+            toolSchema: $driver->getCriticToolSchema(),
+            userMessage: $criticUserMessage,
+        );
+
+        return $this->extractFindingsFromDraft($draft, $critique->approvedFindingIndices());
+    }
+
+    /**
+     * @param  list<int>  $approvedIndices
+     * @return list<array<string, mixed>>
+     */
+    private function extractFindingsFromDraft(DraftReviewDto $draft, array $approvedIndices): array
+    {
+        $out = [];
+        foreach ($approvedIndices as $index) {
+            if (! isset($draft->findings[$index])) {
+                continue;
+            }
+            $finding = $draft->findings[$index];
+            assert($finding instanceof ReviewFindingDto);
+            $out[] = [
+                'path' => $finding->path,
+                'line' => $finding->line,
+                'severity' => $finding->severity,
+                'message' => $finding->message,
+                'category' => $finding->category,
+            ];
+        }
+
+        return $out;
     }
 
     private function resolveDriver(string $provider): LlmDriverInterface

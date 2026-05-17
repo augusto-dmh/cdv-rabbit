@@ -58,4 +58,18 @@ return [
      * to gate auto-merge on cdv-rabbit reviews.
      */
     'status_check_context' => (string) env('CDV_RABBIT_STATUS_CHECK_CONTEXT', 'cdv-rabbit/review'),
+
+    /*
+     * Eval harness settings.
+     *
+     * cross_provider_judge: when true (default, preserves AC41), the LLM-as-judge
+     * for a review produced by provider X uses provider !=X to avoid same-family
+     * sycophancy. Flip to false in environments that only carry one provider's
+     * credentials (e.g. local dev with only OPENAI_API_KEY) — `rabbit:eval` still
+     * runs, but the judge step uses the same provider as the reviewer and loses
+     * the cross-family bias control. See ADR 0007.
+     */
+    'eval' => [
+        'cross_provider_judge' => (bool) env('CDV_RABBIT_EVAL_CROSS_PROVIDER_JUDGE', true),
+    ],
 ];

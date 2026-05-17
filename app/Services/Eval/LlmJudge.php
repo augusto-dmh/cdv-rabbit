@@ -17,14 +17,20 @@ use RuntimeException;
  */
 final class LlmJudge
 {
-    private const ROTATION = [
+    private const ROTATION_CROSS = [
         'anthropic' => 'openai',
         'openai' => 'anthropic',
+    ];
+
+    private const ROTATION_SAME = [
+        'anthropic' => 'anthropic',
+        'openai' => 'openai',
     ];
 
     public function __construct(
         private readonly JudgeLlmCallerInterface $caller,
         private readonly string $judgePromptPath,
+        private readonly bool $crossProviderJudge = true,
     ) {}
 
     /**
@@ -56,15 +62,26 @@ final class LlmJudge
         return $this->result($matches, $missed, $unexpected, $judgeProvider, $expectedFindings, $actualFindings);
     }
 
+    /**
+     * Pick the judge provider for a review produced by $reviewProvider.
+     *
+     * Default behaviour is cross-provider rotation (AC41 — `anthropic <-> openai`)
+     * so same-family sycophancy is avoided. When `cdv-rabbit.eval.cross_provider_judge`
+     * is false (operator escape hatch per ADR 0007 §2), the judge uses the same
+     * provider as the reviewer — useful when only one provider's credentials are
+     * available, at the cost of losing the cross-family bias control.
+     */
     public function pickJudgeProvider(string $reviewProvider): string
     {
-        if (! isset(self::ROTATION[$reviewProvider])) {
+        $rotation = $this->crossProviderJudge ? self::ROTATION_CROSS : self::ROTATION_SAME;
+
+        if (! isset($rotation[$reviewProvider])) {
             throw new InvalidArgumentException(
-                "LlmJudge: unsupported review provider [{$reviewProvider}]. Known providers: ".implode(',', array_keys(self::ROTATION))
+                "LlmJudge: unsupported review provider [{$reviewProvider}]. Known providers: ".implode(',', array_keys($rotation))
             );
         }
 
-        return self::ROTATION[$reviewProvider];
+        return $rotation[$reviewProvider];
     }
 
     /**

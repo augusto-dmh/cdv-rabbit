@@ -25,11 +25,12 @@ function makeFakeCaller(?string $response = null, ?array &$invocations = null): 
     };
 }
 
-function judgeWith(JudgeLlmCallerInterface $caller): LlmJudge
+function judgeWith(JudgeLlmCallerInterface $caller, bool $crossProvider = true): LlmJudge
 {
     return new LlmJudge(
         caller: $caller,
-        judgePromptPath: config_path('cdv-rabbit/prompts/eval_judge_v1.txt'),
+        judgePromptPath: __DIR__.'/../../../config/cdv-rabbit/prompts/eval_judge_v1.txt',
+        crossProviderJudge: $crossProvider,
     );
 }
 
@@ -64,6 +65,24 @@ it('rejects unknown review providers', function (): void {
     $judge = judgeWith(makeFakeCaller());
     $judge->pickJudgeProvider('gemini');
 })->throws(InvalidArgumentException::class);
+
+// ADR 0007 §2: same-provider rotation flag for single-credential environments
+it('picks the same provider as the reviewer when cross_provider_judge is disabled', function (): void {
+    $judge = judgeWith(makeFakeCaller(), crossProvider: false);
+
+    expect($judge->pickJudgeProvider('anthropic'))->toBe('anthropic');
+    expect($judge->pickJudgeProvider('openai'))->toBe('openai');
+});
+
+it('routes the judge call to the same provider when cross_provider_judge is disabled', function (): void {
+    $invocations = [];
+    $judge = judgeWith(makeFakeCaller(invocations: $invocations), crossProvider: false);
+
+    $judge->judge([['path' => 'a.php']], [['path' => 'a.php']], 'openai');
+
+    expect($invocations)->toHaveCount(1);
+    expect($invocations[0]['provider'])->toBe('openai');
+});
 
 it('computes recall and precision from judge matches', function (): void {
     $caller = makeFakeCaller(json_encode([

@@ -40,6 +40,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(LlmJudge::class, fn ($app) => new LlmJudge(
             caller: $app->make(JudgeLlmCallerInterface::class),
             judgePromptPath: config_path('cdv-rabbit/prompts/eval_judge_v1.txt'),
+            crossProviderJudge: (bool) config('cdv-rabbit.eval.cross_provider_judge', true),
         ));
 
         $this->app->singleton(JwtSigner::class, fn ($app) => new JwtSigner(
