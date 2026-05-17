@@ -32,6 +32,17 @@ class OpenAiJudgeAgent implements Agent
 
     public string $systemInstructions = '';
 
+    /**
+     * Runtime model override — read from config so operators can swap models
+     * via CDV_RABBIT_OPENAI_JUDGE_MODEL without touching the #[Model] attribute.
+     * The SDK's Promptable::getProvidersAndModels() checks method_exists($this, 'model')
+     * before reading the attribute, so this method takes priority at dispatch time.
+     */
+    public function model(): string
+    {
+        return (string) config('cdv-rabbit.llm_models.openai_judge', 'gpt-4o');
+    }
+
     public function withInstructions(string $instructions): self
     {
         $this->systemInstructions = $instructions;

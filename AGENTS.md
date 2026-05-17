@@ -231,6 +231,16 @@ W2 workers will be shut down before W3 team spins up.
 
 cdv-rabbit supports Anthropic Claude (default) and OpenAI GPT side-by-side. Provider is selected per workspace via `workspaces.llm_provider` (enum: `anthropic`|`openai`, default `anthropic`). Both providers implement the same `LlmDriverInterface`; the `LlmDriverFactory` resolves the correct driver at job execution time inside `ReviewPullRequestJob::handle()` after loading the workspace. OpenAI uses `response_format: json_schema` strict for structured output; Anthropic uses `tool_choice` strict. Cost reservation Lua keys are scoped per provider (`workspace:{id}:tokens:{date}:{provider}`), giving each provider an independent daily ceiling. `LlmCallTelemetry` records `provider` + `model` for every call. `rabbit:lgpd-check` check #9 gates on `OPENAI_DPA_URL` env being set whenever any workspace uses OpenAI. See `specs/ai-code-review-pipeline.md` §15 and `.omc/plans/openai-provider-support.md`.
 
+**OpenAI model override per role:** The three OpenAI agent classes (`OpenAiReviewAgent`, `OpenAiCriticAgent`, `OpenAiJudgeAgent`) default to `gpt-4o` but read their model from config at dispatch time via a `model()` method that takes priority over the `#[Model]` attribute (the laravel/ai SDK checks `method_exists($agent, 'model')` first). To override, set any of these in `.env`:
+
+```
+CDV_RABBIT_OPENAI_REVIEW_MODEL=gpt-4o   # draft findings pass
+CDV_RABBIT_OPENAI_CRITIC_MODEL=gpt-4o   # critique pass
+CDV_RABBIT_OPENAI_JUDGE_MODEL=gpt-4o    # eval LLM-as-judge (cross-provider)
+```
+
+No code changes or restarts beyond reloading config are required. Config key: `cdv-rabbit.llm_models.{openai_review|openai_critic|openai_judge}`.
+
 ---
 
 ## 4. Locked technical contracts (DO NOT CHANGE without bumping a version)

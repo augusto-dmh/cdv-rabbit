@@ -60,6 +60,20 @@ return [
     'status_check_context' => (string) env('CDV_RABBIT_STATUS_CHECK_CONTEXT', 'cdv-rabbit/review'),
 
     /*
+     * OpenAI model identifiers used by the review pipeline agents.
+     * Override any of these via .env to swap models without touching PHP code.
+     *
+     * openai_review: model for OpenAiReviewAgent (draft findings pass).
+     * openai_critic: model for OpenAiCriticAgent (critique pass).
+     * openai_judge:  model for OpenAiJudgeAgent (eval LLM-as-judge, cross-provider).
+     */
+    'llm_models' => [
+        'openai_review' => env('CDV_RABBIT_OPENAI_REVIEW_MODEL', 'gpt-4o'),
+        'openai_critic' => env('CDV_RABBIT_OPENAI_CRITIC_MODEL', 'gpt-4o'),
+        'openai_judge' => env('CDV_RABBIT_OPENAI_JUDGE_MODEL', 'gpt-4o'),
+    ],
+
+    /*
      * Eval harness settings.
      *
      * cross_provider_judge: when true (default, preserves AC41), the LLM-as-judge

@@ -29,7 +29,7 @@ use Stringable;
  */
 #[Provider(Lab::OpenAI)]
 #[Model('gpt-4o')]
-#[MaxTokens(4096)]
+#[MaxTokens(16384)]
 #[Timeout(300)]
 class OpenAiReviewAgent implements Agent, HasStructuredOutput
 {
@@ -39,6 +39,17 @@ class OpenAiReviewAgent implements Agent, HasStructuredOutput
 
     /** @var array<string, mixed> */
     private array $jsonSchema = [];
+
+    /**
+     * Runtime model override — read from config so operators can swap models
+     * via CDV_RABBIT_OPENAI_REVIEW_MODEL without touching the #[Model] attribute.
+     * The SDK's Promptable::getProvidersAndModels() checks method_exists($this, 'model')
+     * before reading the attribute, so this method takes priority at dispatch time.
+     */
+    public function model(): string
+    {
+        return (string) config('cdv-rabbit.llm_models.openai_review', 'gpt-4o');
+    }
 
     public function withInstructions(string $instructions): self
     {
