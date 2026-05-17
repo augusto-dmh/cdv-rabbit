@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace App\Services\Eval;
 
-use App\Ai\Agents\OpenAiReviewAgent;
+use App\Ai\Agents\OpenAiJudgeAgent;
 use App\Ai\Agents\ReviewAgent;
 use InvalidArgumentException;
 use RuntimeException;
 
 /**
  * Default JudgeLlmCallerInterface implementation backed by the laravel/ai
- * agent classes already used by ClaudeReviewer and OpenAiReviewer. The judge
- * uses a tiny no-schema prompt; we lean on plain text output and parse it
- * downstream rather than re-using the strict review_result_v1 tool schema.
+ * agent classes. The judge prompt expects a JSON object in the response
+ * BODY, so the OpenAI cell uses `OpenAiJudgeAgent` (plain-text, no
+ * HasStructuredOutput) — ADR 0007 §5 fix. The Anthropic cell uses
+ * `ReviewAgent` streamed; the parsing layer extracts JSON from either.
  *
  * This caller is invoked only by `rabbit:eval` against the live API; the
  * EvalCommand feature test binds JudgeLlmCallerInterface to a fake before
@@ -54,7 +55,7 @@ final class LaravelAiJudgeLlmCaller implements JudgeLlmCallerInterface
 
     private function callOpenAi(string $systemPrompt, string $userMessage): string
     {
-        $response = (new OpenAiReviewAgent)
+        $response = (new OpenAiJudgeAgent)
             ->withInstructions($systemPrompt)
             ->prompt($userMessage);
 

@@ -47,6 +47,7 @@ final class EvalCommand extends Command
         {--threshold-recall=0.7 : Minimum recall per cell.}
         {--threshold-precision=0.5 : Minimum precision per cell.}
         {--corpus= : Override the golden corpus root directory.}
+        {--cell-delay=3 : Seconds to sleep between cells to keep provider TPM/RPM under control (ADR 0007 §6). Set 0 to disable.}
     ';
 
     protected $description = 'Run the golden-PR review-quality eval harness across (provider x schema) cells.';
@@ -89,6 +90,9 @@ final class EvalCommand extends Command
         $rows = [];
         $logRows = [];
         $failed = false;
+        $cellDelaySeconds = max(0, (int) $this->option('cell-delay'));
+        $cellsRun = 0;
+        $totalCells = count($fixtures) * count($providers);
 
         foreach ($fixtures as $fixture) {
             foreach ($providers as $provider) {
@@ -108,12 +112,16 @@ final class EvalCommand extends Command
 
                 if ($result->error !== null) {
                     $failed = true;
-
-                    continue;
                 }
 
-                if ($result->recall < $thresholdRecall || $result->precision < $thresholdPrecision) {
+                if ($result->error === null
+                    && ($result->recall < $thresholdRecall || $result->precision < $thresholdPrecision)) {
                     $failed = true;
+                }
+
+                $cellsRun++;
+                if ($cellDelaySeconds > 0 && $cellsRun < $totalCells) {
+                    sleep($cellDelaySeconds);
                 }
             }
         }
